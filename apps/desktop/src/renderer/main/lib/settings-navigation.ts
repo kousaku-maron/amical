@@ -35,9 +35,9 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     type: "settings",
   },
   {
-    title: "Dictation",
-    url: "/settings/dictation",
-    description: "Configure speech recognition and dictation settings",
+    title: "Modes",
+    url: "/settings/modes",
+    description: "Create and manage transcription modes",
     icon: IconMicrophone,
     type: "settings",
   },

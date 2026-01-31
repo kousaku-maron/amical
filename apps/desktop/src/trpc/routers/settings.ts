@@ -54,6 +54,40 @@ const DictationSettingsSchema = z.object({
   selectedLanguage: z.string().min(1), // Must be valid when autoDetectEnabled is false
 });
 
+// Mode schemas
+const CreateModeSchema = z.object({
+  name: z.string().min(1).max(50),
+  dictation: z.object({
+    autoDetectEnabled: z.boolean(),
+    selectedLanguage: z.string(),
+  }),
+  formatterConfig: z.object({
+    enabled: z.boolean(),
+    modelId: z.string().optional(),
+    fallbackModelId: z.string().optional(),
+  }),
+  customInstructions: z.string().max(2000).optional(),
+});
+
+const UpdateModeSchema = z.object({
+  modeId: z.string().min(1),
+  name: z.string().min(1).max(50).optional(),
+  dictation: z
+    .object({
+      autoDetectEnabled: z.boolean(),
+      selectedLanguage: z.string(),
+    })
+    .optional(),
+  formatterConfig: z
+    .object({
+      enabled: z.boolean(),
+      modelId: z.string().optional(),
+      fallbackModelId: z.string().optional(),
+    })
+    .optional(),
+  customInstructions: z.string().max(2000).optional().nullable(),
+});
+
 const AppPreferencesSchema = z.object({
   launchAtLogin: z.boolean().optional(),
   minimizeToTray: z.boolean().optional(),
@@ -733,6 +767,129 @@ export const settingsRouter = createRouter({
           logger.main.error("Error updating telemetry settings:", error);
         }
         throw error;
+      }
+    }),
+
+  // Get all modes
+  getModes: procedure.query(async ({ ctx }) => {
+    const settingsService = ctx.serviceManager.getService("settingsService");
+    if (!settingsService) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "SettingsService not available",
+      });
+    }
+    return await settingsService.getModes();
+  }),
+
+  // Get active mode
+  getActiveMode: procedure.query(async ({ ctx }) => {
+    const settingsService = ctx.serviceManager.getService("settingsService");
+    if (!settingsService) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "SettingsService not available",
+      });
+    }
+    return await settingsService.getActiveMode();
+  }),
+
+  // Set active mode
+  setActiveMode: procedure
+    .input(z.object({ modeId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const settingsService = ctx.serviceManager.getService("settingsService");
+      if (!settingsService) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "SettingsService not available",
+        });
+      }
+      try {
+        await settingsService.setActiveMode(input.modeId);
+        return true;
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Failed to set active mode",
+        });
+      }
+    }),
+
+  // Create a new mode
+  createMode: procedure
+    .input(CreateModeSchema)
+    .mutation(async ({ input, ctx }) => {
+      const settingsService = ctx.serviceManager.getService("settingsService");
+      if (!settingsService) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "SettingsService not available",
+        });
+      }
+      try {
+        return await settingsService.createMode(input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Failed to create mode",
+        });
+      }
+    }),
+
+  // Update an existing mode
+  updateMode: procedure
+    .input(UpdateModeSchema)
+    .mutation(async ({ input, ctx }) => {
+      const settingsService = ctx.serviceManager.getService("settingsService");
+      if (!settingsService) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "SettingsService not available",
+        });
+      }
+      const { modeId, ...updates } = input;
+      // Convert null customInstructions to undefined for deletion
+      const cleanUpdates = {
+        ...updates,
+        customInstructions:
+          updates.customInstructions === null
+            ? undefined
+            : updates.customInstructions,
+      };
+      try {
+        return await settingsService.updateMode(modeId, cleanUpdates);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Failed to update mode",
+        });
+      }
+    }),
+
+  // Delete a mode
+  deleteMode: procedure
+    .input(z.object({ modeId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const settingsService = ctx.serviceManager.getService("settingsService");
+      if (!settingsService) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "SettingsService not available",
+        });
+      }
+      try {
+        await settingsService.deleteMode(input.modeId);
+        return true;
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Failed to delete mode",
+        });
       }
     }),
 

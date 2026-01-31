@@ -107,6 +107,25 @@ export const models = sqliteTable(
   ],
 );
 
+// Mode configuration - each mode is a complete dictation/formatting profile
+export interface ModeConfig {
+  id: string; // "default" for built-in, crypto.randomUUID() for user-created
+  name: string;
+  isDefault: boolean; // true only for the built-in mode; cannot be deleted
+  dictation: {
+    autoDetectEnabled: boolean;
+    selectedLanguage: string;
+  };
+  formatterConfig: {
+    enabled: boolean;
+    modelId?: string;
+    fallbackModelId?: string;
+  };
+  customInstructions?: string; // Free-text injected into formatter system prompt
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}
+
 // Define the shape of our settings JSON
 export interface AppSettingsData {
   formatterConfig?: {
@@ -184,6 +203,11 @@ export interface AppSettingsData {
       name?: string;
     };
   };
+  modes?: {
+    items: ModeConfig[];
+    activeModeId: string; // Must match an item's id
+  };
+  _voxVersion?: number; // Custom migration version (independent from upstream `version` column)
   onboarding?: {
     completedVersion: number;
     completedAt: string; // ISO 8601 timestamp

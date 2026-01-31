@@ -391,7 +391,10 @@ export class TranscriptionService {
       session.recordingStartedAt = recordingStartedAt;
     }
 
-    const formatterConfig = await this.settingsService.getFormatterConfig();
+    // Use mode snapshot from session start (prevents mid-session mode switch issues)
+    const formatterConfig =
+      session.context.metadata.get("modeFormatterConfig") ??
+      (await this.settingsService.getFormatterConfig()); // Fallback for legacy sessions
     const shouldUseCloudFormatting =
       formatterConfig?.enabled && formatterConfig.modelId === "amical-cloud";
     let usedCloudProvider = false;
@@ -741,14 +744,14 @@ export class TranscriptionService {
     // Create default context
     const context = createDefaultContext(uuid());
 
-    // Load dictation settings to get language preference
-    const dictationSettings = await this.settingsService.getDictationSettings();
-    if (dictationSettings) {
-      context.sharedData.userPreferences.language =
-        dictationSettings.autoDetectEnabled
-          ? undefined
-          : dictationSettings.selectedLanguage || "en";
-    }
+    // Snapshot active mode at session start (prevents mid-session mode switch issues)
+    const activeMode = await this.settingsService.getActiveMode();
+    context.sharedData.userPreferences.language =
+      activeMode.dictation.autoDetectEnabled
+        ? undefined
+        : activeMode.dictation.selectedLanguage || "en";
+    context.metadata.set("customInstructions", activeMode.customInstructions);
+    context.metadata.set("modeFormatterConfig", activeMode.formatterConfig);
 
     // Load vocabulary and replacements
     const vocabEntries = await getVocabulary({ limit: 50 });
@@ -762,8 +765,6 @@ export class TranscriptionService {
         context.sharedData.vocabulary.push(entry.word);
       }
     }
-
-    // TODO: Load formatter config from settings
 
     return context;
   }
@@ -847,6 +848,8 @@ export class TranscriptionService {
                 ]
               : undefined,
           aggregatedTranscription: text,
+          customInstructions:
+            session.context.metadata.get("customInstructions") ?? undefined,
         },
       });
 
