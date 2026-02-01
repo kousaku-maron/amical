@@ -2,6 +2,10 @@ name: Dev Build (Unsigned)
 
 on:
   workflow_dispatch:
+  # TODO: テスト後に削除する
+  push:
+    branches:
+      - feat/unsigned-dmg-build-workflow
 
 jobs:
   build-macos-arm64:
