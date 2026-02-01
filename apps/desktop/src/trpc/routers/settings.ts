@@ -5,6 +5,7 @@ import { app } from "electron";
 import path from "node:path";
 import { createRouter, procedure } from "../trpc";
 import { dbPath, closeDatabase } from "../../db";
+import type { ModeConfig } from "../../db/schema";
 import * as fs from "fs/promises";
 
 // FormatterConfig schema
@@ -67,6 +68,8 @@ const CreateModeSchema = z.object({
     fallbackModelId: z.string().optional(),
   }),
   customInstructions: z.string().max(2000).optional(),
+  speechModelId: z.string().optional(),
+  appBindings: z.array(z.string()).max(20).optional(),
 });
 
 const UpdateModeSchema = z.object({
@@ -86,6 +89,8 @@ const UpdateModeSchema = z.object({
     })
     .optional(),
   customInstructions: z.string().max(2000).optional().nullable(),
+  speechModelId: z.string().optional().nullable(),
+  appBindings: z.array(z.string()).max(20).optional().nullable(),
 });
 
 const AppPreferencesSchema = z.object({
@@ -851,14 +856,26 @@ export const settingsRouter = createRouter({
         });
       }
       const { modeId, ...updates } = input;
-      // Convert null customInstructions to undefined for deletion
-      const cleanUpdates = {
-        ...updates,
-        customInstructions:
-          updates.customInstructions === null
-            ? undefined
-            : updates.customInstructions,
-      };
+      // Build cleanUpdates from only the keys actually present in `updates`.
+      // Zod strips absent optional fields, so Object.entries only yields
+      // fields the caller explicitly provided. Convert null → undefined
+      // to signal "clear this field" when spread over the existing mode.
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).map(([key, value]) => [
+          key,
+          value === null ? undefined : value,
+        ]),
+      ) as Partial<
+        Pick<
+          ModeConfig,
+          | "name"
+          | "dictation"
+          | "formatterConfig"
+          | "customInstructions"
+          | "speechModelId"
+          | "appBindings"
+        >
+      >;
       try {
         return await settingsService.updateMode(modeId, cleanUpdates);
       } catch (error) {
@@ -946,6 +963,11 @@ export const settingsRouter = createRouter({
       }
       throw new Error("Failed to reset app");
     }
+  }),
+
+  getInstalledApps: procedure.query(async ({ ctx }) => {
+    const service = ctx.serviceManager.getService("installedAppsService");
+    return await service.getInstalledApps();
   }),
 });
 // This comment prevents prettier from removing the trailing newline

@@ -122,6 +122,8 @@ export interface ModeConfig {
     fallbackModelId?: string;
   };
   customInstructions?: string; // Free-text injected into formatter system prompt
+  speechModelId?: string; // Per-mode speech model override; undefined = use global default
+  appBindings?: string[]; // Bundle identifiers for auto-switch (e.g. ["com.apple.mail"])
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
 }

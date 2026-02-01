@@ -505,7 +505,7 @@ export class SettingsService extends EventEmitter {
   async updateMode(
     modeId: string,
     updates: Partial<
-      Pick<ModeConfig, "name" | "dictation" | "formatterConfig" | "customInstructions">
+      Pick<ModeConfig, "name" | "dictation" | "formatterConfig" | "customInstructions" | "speechModelId" | "appBindings">
     >,
   ): Promise<ModeConfig> {
     const { items, activeModeId } = await this.getModes();
@@ -547,5 +547,15 @@ export class SettingsService extends EventEmitter {
     if (activeModeId === modeId) {
       this.emit("active-mode-changed", { modeId: newActiveModeId });
     }
+  }
+
+  async findModeByBundleId(bundleId: string): Promise<ModeConfig | null> {
+    const { items } = await this.getModes();
+    for (const mode of items) {
+      if (mode.appBindings?.includes(bundleId)) {
+        return mode;
+      }
+    }
+    return null;
   }
 }

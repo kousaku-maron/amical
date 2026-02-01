@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Combobox } from "@/components/ui/combobox";
+import { ComboboxMulti } from "@/components/ui/combobox-multi";
 import {
   Collapsible,
   CollapsibleContent,
@@ -37,6 +38,9 @@ import { toast } from "sonner";
 import type { ModeConfig } from "@/db/schema";
 import { CustomInstructionsEditor } from "./CustomInstructionsEditor";
 import type { ComboboxOption } from "@/components/ui/combobox";
+
+const GLOBAL_DEFAULT_VALUE = "__global_default__";
+
 
 interface ModeCardProps {
   mode: ModeConfig;
@@ -93,6 +97,33 @@ export function ModeCard({
 
     return [...options, ...languageOptions];
   }, [languageModels]);
+
+  // Installed apps query for app bindings
+  const installedAppsQuery = api.settings.getInstalledApps.useQuery();
+  const installedApps = installedAppsQuery.data ?? [];
+
+  const appBindingOptions = useMemo(() => {
+    const installedOptions = installedApps.map((a) => ({
+      value: a.bundleId,
+      label: a.name,
+      icon: a.icon,
+    }));
+
+    // Preserve existing bindings that may no longer be installed
+    const installedIds = new Set(installedApps.map((a) => a.bundleId));
+    const existingBindings = (mode.appBindings ?? [])
+      .filter((id) => !installedIds.has(id))
+      .map((id) => ({ value: id, label: id, icon: undefined }));
+
+    return [...installedOptions, ...existingBindings];
+  }, [installedApps, mode.appBindings]);
+
+  // Speech model options: global default, cloud, or local whisper
+  const speechModelOptions: ComboboxOption[] = [
+    { value: GLOBAL_DEFAULT_VALUE, label: "Use global default" },
+    { value: "amical-cloud", label: "Amical Cloud" },
+    { value: "local-whisper", label: "Local Whisper" },
+  ];
 
   // Mutations
   const updateModeMutation = api.settings.updateMode.useMutation({
@@ -216,6 +247,26 @@ export function ModeCard({
     [mode.id, updateModeMutation],
   );
 
+  const handleSpeechModelChange = useCallback(
+    (value: string) => {
+      updateModeMutation.mutate({
+        modeId: mode.id,
+        speechModelId: value === GLOBAL_DEFAULT_VALUE ? null : value,
+      });
+    },
+    [mode.id, updateModeMutation],
+  );
+
+  const handleAppBindingsChange = useCallback(
+    (values: string[]) => {
+      updateModeMutation.mutate({
+        modeId: mode.id,
+        appBindings: values.length > 0 ? values : null,
+      });
+    },
+    [mode.id, updateModeMutation],
+  );
+
   const handleSetActive = useCallback(() => {
     setActiveModeMutation.mutate({ modeId: mode.id });
   }, [mode.id, setActiveModeMutation]);
@@ -247,6 +298,11 @@ export function ModeCard({
       )?.label || "Enabled"
     : "Off";
 
+  const speechModelLabel = mode.speechModelId
+    ? speechModelOptions.find((o) => o.value === mode.speechModelId)?.label ||
+      mode.speechModelId
+    : null;
+
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
       <div className="border border-border rounded-lg">
@@ -268,6 +324,40 @@ export function ModeCard({
                   >
                     {formattingLabel}
                   </Badge>
+                )}
+                {speechModelLabel && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1.5 py-0"
+                  >
+                    {speechModelLabel}
+                  </Badge>
+                )}
+                {mode.appBindings && mode.appBindings.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {mode.appBindings.slice(0, 5).map((bundleId) => {
+                      const appOption = appBindingOptions.find(
+                        (o) => o.value === bundleId,
+                      );
+                      return appOption?.icon ? (
+                        <img
+                          key={bundleId}
+                          src={appOption.icon}
+                          alt={appOption.label}
+                          title={appOption.label}
+                          className="h-5 w-5 rounded-sm"
+                        />
+                      ) : null;
+                    })}
+                    {mode.appBindings.length > 5 && (
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] px-1 py-0 ml-1"
+                      >
+                        +{mode.appBindings.length - 5}
+                      </Badge>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -355,6 +445,25 @@ export function ModeCard({
 
             <Separator />
 
+            {/* Speech model settings */}
+            <div>
+              <Label className="text-base font-semibold text-foreground">
+                Speech model
+              </Label>
+              <p className="text-xs text-muted-foreground mb-4">
+                Choose the speech recognition model for this mode. Uses the
+                global default when not set.
+              </p>
+              <Combobox
+                options={speechModelOptions}
+                value={mode.speechModelId ?? GLOBAL_DEFAULT_VALUE}
+                onChange={handleSpeechModelChange}
+                placeholder="Select a speech model..."
+              />
+            </div>
+
+            <Separator />
+
             {/* Formatting settings */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -436,6 +545,30 @@ export function ModeCard({
                   value={localCustomInstructions}
                   onChange={handleCustomInstructionsChange}
                 />
+              </>
+            )}
+
+            {appBindingOptions.length > 0 && (
+              <>
+                <Separator />
+
+                {/* App bindings */}
+                <div>
+                  <Label className="text-base font-semibold text-foreground">
+                    Auto-switch apps
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Automatically activate this mode when any of these apps are
+                    in the foreground. If multiple modes match, the first one in
+                    the list wins.
+                  </p>
+                  <ComboboxMulti
+                    options={appBindingOptions}
+                    value={mode.appBindings ?? []}
+                    onChange={handleAppBindingsChange}
+                    placeholder="Select apps..."
+                  />
+                </div>
               </>
             )}
 

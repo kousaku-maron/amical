@@ -66,17 +66,20 @@ export class TranscriptionService {
   /**
    * Select the appropriate transcription provider based on the selected model
    */
-  private async selectProvider(): Promise<TranscriptionProvider> {
-    const selectedModelId = await this.modelService.getSelectedModel();
+  private async selectProvider(
+    speechModelId?: string,
+  ): Promise<TranscriptionProvider> {
+    const effectiveModelId =
+      speechModelId ?? (await this.modelService.getSelectedModel());
 
-    if (!selectedModelId) {
+    if (!effectiveModelId) {
       // Default to whisper if no model selected
       this.currentProvider = this.whisperProvider;
       return this.whisperProvider;
     }
 
     // Find the model in AVAILABLE_MODELS
-    const model = AVAILABLE_MODELS.find((m) => m.id === selectedModelId);
+    const model = AVAILABLE_MODELS.find((m) => m.id === effectiveModelId);
 
     // Use cloud provider for Amical Cloud models
     if (model?.provider === "Amical Cloud") {
@@ -298,8 +301,9 @@ export class TranscriptionService {
           : undefined;
       const aggregatedTranscription = session.transcriptionResults.join("");
 
-      // Select the appropriate provider
-      const provider = await this.selectProvider();
+      // Select the appropriate provider (use per-mode override if snapshotted)
+      const speechModelId = session.context.sharedData.speechModelId;
+      const provider = await this.selectProvider(speechModelId);
 
       // Transcribe chunk (flush is done separately in finalizeSession)
       const chunkTranscription = await provider.transcribe({
@@ -391,10 +395,7 @@ export class TranscriptionService {
       session.recordingStartedAt = recordingStartedAt;
     }
 
-    // Use mode snapshot from session start (prevents mid-session mode switch issues)
-    const formatterConfig =
-      session.context.metadata.get("modeFormatterConfig") ??
-      (await this.settingsService.getFormatterConfig()); // Fallback for legacy sessions
+    const formatterConfig = session.context.sharedData.formatter;
     const shouldUseCloudFormatting =
       formatterConfig?.enabled && formatterConfig.modelId === "amical-cloud";
     let usedCloudProvider = false;
@@ -410,7 +411,8 @@ export class TranscriptionService {
           : undefined;
       const aggregatedTranscription = session.transcriptionResults.join("");
 
-      const provider = await this.selectProvider();
+      const speechModelId = session.context.sharedData.speechModelId;
+      const provider = await this.selectProvider(speechModelId);
       usedCloudProvider = provider.name === "amical-cloud";
       const finalTranscription = await provider.flush({
         sessionId,
@@ -744,14 +746,29 @@ export class TranscriptionService {
     // Create default context
     const context = createDefaultContext(uuid());
 
-    // Snapshot active mode at session start (prevents mid-session mode switch issues)
+    // Resolve effective mode at session start:
     const activeMode = await this.settingsService.getActiveMode();
-    context.sharedData.userPreferences.language =
-      activeMode.dictation.autoDetectEnabled
-        ? undefined
-        : activeMode.dictation.selectedLanguage || "en";
-    context.metadata.set("customInstructions", activeMode.customInstructions);
-    context.metadata.set("modeFormatterConfig", activeMode.formatterConfig);
+    let effectiveMode = activeMode;
+
+    const appContext = this.nativeBridge?.getAccessibilityContext();
+    const bundleId = appContext?.context?.application?.bundleIdentifier;
+    if (bundleId) {
+      const appBoundMode =
+        await this.settingsService.findModeByBundleId(bundleId);
+      if (appBoundMode) {
+        effectiveMode = appBoundMode;
+      }
+    }
+
+    context.sharedData.userPreferences.language = effectiveMode.dictation
+      .autoDetectEnabled
+      ? undefined
+      : effectiveMode.dictation.selectedLanguage || "en";
+    context.sharedData.customInstructions = effectiveMode.customInstructions;
+    context.sharedData.formatter =
+      effectiveMode.formatterConfig ??
+      (await this.settingsService.getFormatterConfig());
+    context.sharedData.speechModelId = effectiveMode.speechModelId;
 
     // Load vocabulary and replacements
     const vocabEntries = await getVocabulary({ limit: 50 });
@@ -848,8 +865,7 @@ export class TranscriptionService {
                 ]
               : undefined,
           aggregatedTranscription: text,
-          customInstructions:
-            session.context.metadata.get("customInstructions") ?? undefined,
+          customInstructions: session.context.sharedData.customInstructions,
         },
       });
 
