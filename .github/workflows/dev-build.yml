@@ -2,10 +2,9 @@ name: Dev Build (Unsigned)
 
 on:
   workflow_dispatch:
-  # TODO: テスト後に削除する
   push:
     branches:
-      - feat/unsigned-dmg-build-workflow
+      - vox-alpha
 
 jobs:
   build-macos-arm64:
@@ -36,8 +35,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24.1.0'
-          cache: 'pnpm'
+          node-version: "24.1.0"
+          cache: "pnpm"
 
       - name: Log Node.js architecture and platform
         run: |
@@ -66,8 +65,8 @@ jobs:
       - name: Build artifacts (Unsigned)
         working-directory: apps/desktop
         env:
-          SKIP_CODESIGNING: 'true'
-          SKIP_NOTARIZATION: 'true'
+          SKIP_CODESIGNING: "true"
+          SKIP_NOTARIZATION: "true"
           POSTHOG_HOST: https://app.posthog.com
           TELEMETRY_ENABLED: true
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
