@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "@/renderer/tauri/electron-shim";
 import { App } from "./App";
 import { OnboardingErrorBoundary } from "./components/ErrorBoundary";
 import { api, trpcClient } from "@/trpc/react";

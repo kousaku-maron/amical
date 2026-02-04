@@ -1,0 +1,24 @@
+[package]
+name = "vox-tauri"
+version = "0.0.1"
+description = "Vox Desktop app (Tauri)"
+authors = ["Amical <contact@amical.ai>"]
+license = "MIT"
+repository = "https://github.com/amicalhq/amical"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
+tauri-plugin-opener = "2.0.0"
+tauri-plugin-dialog = "2.0.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+yrs = "0.18"
+uuid = { version = "1", features = ["v4"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "multipart", "rustls-tls"] }

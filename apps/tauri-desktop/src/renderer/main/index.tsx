@@ -1,5 +1,6 @@
 import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
+import "@/renderer/tauri/electron-shim";
 import "@/styles/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -20,8 +21,12 @@ declare global {
   }
 }
 
-// Main window scoped logger setup with guards
-const mainWindowLogger = window.electronAPI?.log?.scope?.("mainWindow");
+const isTauriRuntime = typeof window !== "undefined" && "__TAURI__" in window;
+const isTauriShim = Boolean((window.electronAPI as any)?.__isTauriShim);
+// Main window scoped logger setup with guards (Electron only)
+const mainWindowLogger = !isTauriRuntime && !isTauriShim
+  ? window.electronAPI?.log?.scope?.("mainWindow")
+  : undefined;
 
 // Store original console methods with proper binding
 const originalConsole = {
@@ -32,27 +37,29 @@ const originalConsole = {
   debug: console.debug.bind(console),
 };
 
-// Proxy console methods to use BOTH original console AND main window logger
-console.log = (...args: unknown[]) => {
-  originalConsole.log(...args); // Show in dev console
-  mainWindowLogger?.info?.(...args); // Send via IPC if available
-};
-console.info = (...args: unknown[]) => {
-  originalConsole.info(...args);
-  mainWindowLogger?.info?.(...args);
-};
-console.warn = (...args: unknown[]) => {
-  originalConsole.warn(...args);
-  mainWindowLogger?.warn?.(...args);
-};
-console.error = (...args: unknown[]) => {
-  originalConsole.error(...args);
-  mainWindowLogger?.error?.(...args);
-};
-console.debug = (...args: unknown[]) => {
-  originalConsole.debug(...args);
-  mainWindowLogger?.debug?.(...args);
-};
+if (mainWindowLogger) {
+  // Proxy console methods to use BOTH original console AND main window logger
+  console.log = (...args: unknown[]) => {
+    originalConsole.log(...args); // Show in dev console
+    mainWindowLogger.info?.(...args); // Send via IPC if available
+  };
+  console.info = (...args: unknown[]) => {
+    originalConsole.info(...args);
+    mainWindowLogger.info?.(...args);
+  };
+  console.warn = (...args: unknown[]) => {
+    originalConsole.warn(...args);
+    mainWindowLogger.warn?.(...args);
+  };
+  console.error = (...args: unknown[]) => {
+    originalConsole.error(...args);
+    mainWindowLogger.error?.(...args);
+  };
+  console.debug = (...args: unknown[]) => {
+    originalConsole.debug(...args);
+    mainWindowLogger.debug?.(...args);
+  };
+}
 
 // Keep original methods available if needed
 console.original = originalConsole;

@@ -45,5 +45,6 @@ export interface ElectronAPI {
   notes: {
     saveYjsUpdate: (noteId: number, update: ArrayBuffer) => Promise<void>;
     loadYjsUpdates: (noteId: number) => Promise<ArrayBuffer[]>;
+    replaceYjsUpdates: (noteId: number, update: ArrayBuffer) => Promise<void>;
   };
 }

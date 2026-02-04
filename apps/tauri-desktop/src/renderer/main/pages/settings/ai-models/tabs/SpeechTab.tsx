@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+import { showOAuthNotImplemented } from "@/renderer/tauri/oauth";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -192,7 +193,11 @@ export default function SpeechTab() {
 
   // Auth mutations
   const loginMutation = api.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (!result?.success) {
+        showOAuthNotImplemented(result?.message);
+        return;
+      }
       toast.info("Please complete login in your browser");
     },
     onError: (error) => {

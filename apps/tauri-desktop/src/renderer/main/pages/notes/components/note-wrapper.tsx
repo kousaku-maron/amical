@@ -22,6 +22,7 @@ export default function NotePage({ noteId, onBack }: NotePageProps) {
   const [noteBody, setNoteBody] = useState("");
   const [isSyncing, setIsSyncing] = useState(true);
   const [noteIcon, setNoteIcon] = useState<string | null>(null);
+  const COMPACTION_THRESHOLD = 50;
 
   // Refs
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -120,6 +121,9 @@ export default function NotePage({ noteId, onBack }: NotePageProps) {
         textRef.current = text;
 
         // Load existing updates from backend
+        const toArrayBuffer = (update: Uint8Array) =>
+          update.buffer.slice(update.byteOffset, update.byteOffset + update.byteLength);
+
         try {
           const updates = await window.electronAPI.notes.loadYjsUpdates(
             note.id,
@@ -130,10 +134,26 @@ export default function NotePage({ noteId, onBack }: NotePageProps) {
             updates.forEach((update: ArrayBuffer) => {
               Y.applyUpdate(ydoc, new Uint8Array(update));
             });
+          } else if (note.content) {
+            // Seed Yjs when legacy content exists but no updates are stored yet
+            text.insert(0, note.content);
+            const initialUpdate = Y.encodeStateAsUpdate(ydoc);
+            await window.electronAPI.notes.saveYjsUpdate(
+              note.id,
+              toArrayBuffer(initialUpdate) as ArrayBuffer,
+            );
+          }
 
-            // Set content from the reconstructed document
-            const reconstructedContent = text.toString();
-            setNoteBody(reconstructedContent);
+          // Set content from the reconstructed document
+          const reconstructedContent = text.toString();
+          setNoteBody(reconstructedContent);
+
+          if (updates.length > COMPACTION_THRESHOLD) {
+            const compacted = Y.encodeStateAsUpdate(ydoc);
+            await window.electronAPI.notes.replaceYjsUpdates(
+              note.id,
+              toArrayBuffer(compacted) as ArrayBuffer,
+            );
           }
         } catch (error) {
           console.error("Failed to load yjs updates:", error);

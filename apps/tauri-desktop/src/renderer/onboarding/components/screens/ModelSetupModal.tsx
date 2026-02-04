@@ -13,6 +13,7 @@ import { Loader2, Download, AlertCircle, Check } from "lucide-react";
 import { api } from "@/trpc/react";
 import { ModelType } from "../../../../types/onboarding";
 import { toast } from "sonner";
+import { showOAuthNotImplemented } from "@/renderer/tauri/oauth";
 
 interface ModelSetupModalProps {
   isOpen: boolean;
@@ -52,7 +53,12 @@ export function ModelSetupModal({
 
   // tRPC mutations
   const loginMutation = api.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (!result?.success) {
+        showOAuthNotImplemented(result?.message);
+        setIsLoading(false);
+        return;
+      }
       // Browser opened, waiting for OAuth completion via subscription
       toast.info("Complete login in your browser");
     },

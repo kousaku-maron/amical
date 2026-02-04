@@ -5,18 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: Date): string {
+export function formatDate(date: Date | string | number): string {
+  const parsed = date instanceof Date ? date : new Date(date);
   const now = new Date();
   const diffInDays = Math.floor(
-    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+    (now.getTime() - parsed.getTime()) / (1000 * 60 * 60 * 24),
   );
 
   if (diffInDays === 0) return "Today";
   if (diffInDays === 1) return "Yesterday";
 
-  return date.toLocaleDateString("en-US", {
+  return parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    year: parsed.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
   });
 }

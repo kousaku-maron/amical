@@ -2,6 +2,7 @@ import { useMemo, useCallback, useState } from "react";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
 import type { FormatterConfig } from "@/types/formatter";
+import { showOAuthNotImplemented } from "@/renderer/tauri/oauth";
 
 import type { ComboboxOption } from "@/components/ui/combobox";
 
@@ -81,7 +82,11 @@ export function useFormattingSettings(): UseFormattingSettingsReturn {
     });
 
   const loginMutation = api.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (!result?.success) {
+        showOAuthNotImplemented(result?.message);
+        return;
+      }
       toast.info("Complete login in your browser");
     },
     onError: (error) => {

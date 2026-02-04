@@ -14,6 +14,27 @@ interface ShortcutInputProps {
 
 const MODIFIER_KEYS = ["Cmd", "Win", "Ctrl", "Alt", "Shift", "Fn"];
 const MAX_KEY_COMBINATION_LENGTH = 4;
+const isTauriRuntime =
+  typeof window !== "undefined" && "__TAURI__" in window;
+
+const normalizeKey = (event: KeyboardEvent): string | null => {
+  const key = event.key;
+  if (!key) return null;
+  if (key === " ") return "Space";
+  if (key === "Meta") return window.electronAPI?.platform === "darwin" ? "Cmd" : "Win";
+  if (key === "Control") return "Ctrl";
+  if (key === "Alt") return "Alt";
+  if (key === "Shift") return "Shift";
+  if (key === "Escape") return "Escape";
+  if (key === "Backspace") return "Backspace";
+  if (key === "Delete") return "Delete";
+  if (key === "Tab") return "Tab";
+  if (key === "Enter") return "Enter";
+  if (key.startsWith("Arrow")) return key.replace("Arrow", "");
+  if (/^F\\d+$/.test(key)) return key;
+  if (key.length === 1) return key.toUpperCase();
+  return key;
+};
 
 type ValidationResult = {
   valid: boolean;
@@ -142,7 +163,7 @@ export function ShortcutInput({
   // updates its callback reference, so previousKeys correctly captures the
   // previous state value when onData fires.
   api.settings.activeKeysUpdates.useSubscription(undefined, {
-    enabled: isRecordingShortcut,
+    enabled: isRecordingShortcut && !isTauriRuntime,
     onData: (keys: string[]) => {
       const previousKeys = activeKeys;
       setActiveKeys(keys);
@@ -173,6 +194,62 @@ export function ShortcutInput({
       setActiveKeys([]);
     }
   }, [isRecordingShortcut]);
+
+  useEffect(() => {
+    if (!isRecordingShortcut || !isTauriRuntime) {
+      return;
+    }
+
+    let previousKeys: string[] = [];
+    const pressedKeys = new Set<string>();
+
+    const updateKeys = () => {
+      const keys = Array.from(pressedKeys);
+      setActiveKeys(keys);
+      previousKeys = keys;
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = normalizeKey(event);
+      if (!key) return;
+      if (event.repeat) return;
+      event.preventDefault();
+      pressedKeys.add(key);
+      updateKeys();
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      const key = normalizeKey(event);
+      if (!key) return;
+      event.preventDefault();
+      pressedKeys.delete(key);
+      const nextKeys = Array.from(pressedKeys);
+      setActiveKeys(nextKeys);
+
+      if (previousKeys.length > 0 && nextKeys.length < previousKeys.length) {
+        const result = validateShortcutFormat(previousKeys);
+
+        if (result.valid && result.shortcut) {
+          onChange(result.shortcut);
+        } else {
+          toast.error(result.error || "Invalid key combination");
+        }
+
+        onRecordingShortcutChange(false);
+        setRecordingStateMutation.mutate(false);
+      }
+
+      previousKeys = nextKeys;
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [isRecordingShortcut, onChange, onRecordingShortcutChange, setRecordingStateMutation]);
 
   return (
     <TooltipProvider>

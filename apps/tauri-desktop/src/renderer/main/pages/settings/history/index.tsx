@@ -38,11 +38,12 @@ function getTitle(text: string) {
   return text;
 }
 
-function formatDate(timestamp: Date) {
-  return format(timestamp, "MMM d, h:mm a");
+function formatDate(timestamp: Date | string | number) {
+  const parsed = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  return format(parsed, "MMM d, h:mm a");
 }
 
-function getDateGroup(timestamp: Date) {
+function getDateGroup(timestamp: Date | string | number) {
   const today = new Date();
   const itemDate = new Date(timestamp);
 
@@ -284,8 +285,10 @@ export default function HistorySettingsPage() {
 
   const downloadAudioMutation =
     api.transcriptions.downloadAudioFile.useMutation({
-      onSuccess: () => {
-        toast.success("Audio file downloaded");
+      onSuccess: (data) => {
+        if (data?.success) {
+          toast.success("Audio file downloaded");
+        }
       },
       onError: (error) => {
         console.error("Error downloading audio:", error);
