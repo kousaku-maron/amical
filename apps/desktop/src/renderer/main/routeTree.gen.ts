@@ -20,7 +20,6 @@ import { Route as SettingsHistoryRouteImport } from './routes/settings/history'
 import { Route as SettingsDictationRouteImport } from './routes/settings/dictation'
 import { Route as SettingsAiModelsRouteImport } from './routes/settings/ai-models'
 import { Route as SettingsAdvancedRouteImport } from './routes/settings/advanced'
-import { Route as SettingsAboutRouteImport } from './routes/settings/about'
 
 const SettingsRouteRoute = SettingsRouteRouteImport.update({
   id: '/settings',
@@ -77,16 +76,10 @@ const SettingsAdvancedRoute = SettingsAdvancedRouteImport.update({
   path: '/advanced',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
-const SettingsAboutRoute = SettingsAboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => SettingsRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRouteRouteWithChildren
-  '/settings/about': typeof SettingsAboutRoute
   '/settings/advanced': typeof SettingsAdvancedRoute
   '/settings/ai-models': typeof SettingsAiModelsRoute
   '/settings/dictation': typeof SettingsDictationRoute
@@ -99,7 +92,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/settings/about': typeof SettingsAboutRoute
   '/settings/advanced': typeof SettingsAdvancedRoute
   '/settings/ai-models': typeof SettingsAiModelsRoute
   '/settings/dictation': typeof SettingsDictationRoute
@@ -114,7 +106,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/settings': typeof SettingsRouteRouteWithChildren
-  '/settings/about': typeof SettingsAboutRoute
   '/settings/advanced': typeof SettingsAdvancedRoute
   '/settings/ai-models': typeof SettingsAiModelsRoute
   '/settings/dictation': typeof SettingsDictationRoute
@@ -130,7 +121,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/settings'
-    | '/settings/about'
     | '/settings/advanced'
     | '/settings/ai-models'
     | '/settings/dictation'
@@ -143,7 +133,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/settings/about'
     | '/settings/advanced'
     | '/settings/ai-models'
     | '/settings/dictation'
@@ -157,7 +146,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/settings'
-    | '/settings/about'
     | '/settings/advanced'
     | '/settings/ai-models'
     | '/settings/dictation'
@@ -253,18 +241,10 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAdvancedRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
-    '/settings/about': {
-      id: '/settings/about'
-      path: '/about'
-      fullPath: '/settings/about'
-      preLoaderRoute: typeof SettingsAboutRouteImport
-      parentRoute: typeof SettingsRouteRoute
-    }
   }
 }
 
 interface SettingsRouteRouteChildren {
-  SettingsAboutRoute: typeof SettingsAboutRoute
   SettingsAdvancedRoute: typeof SettingsAdvancedRoute
   SettingsAiModelsRoute: typeof SettingsAiModelsRoute
   SettingsDictationRoute: typeof SettingsDictationRoute
@@ -277,7 +257,6 @@ interface SettingsRouteRouteChildren {
 }
 
 const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
-  SettingsAboutRoute: SettingsAboutRoute,
   SettingsAdvancedRoute: SettingsAdvancedRoute,
   SettingsAiModelsRoute: SettingsAiModelsRoute,
   SettingsDictationRoute: SettingsDictationRoute,

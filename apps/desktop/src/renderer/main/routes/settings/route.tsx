@@ -20,7 +20,6 @@ function SettingsLayout() {
       "/settings/ai-models": "AI Models",
       "/settings/history": "History",
       "/settings/advanced": "Advanced",
-      "/settings/about": "About",
     };
     return routes[pathname] || "Settings";
   };

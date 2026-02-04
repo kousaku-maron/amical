@@ -4,7 +4,6 @@ import {
   IconBook,
   IconBrain,
   IconHistory,
-  IconInfoCircle,
   IconKeyboard,
   IconAdjustments,
   type Icon,
@@ -66,13 +65,6 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     url: "/settings/advanced",
     description: "Advanced configuration options",
     icon: IconAdjustments,
-    type: "settings",
-  },
-  {
-    title: "About",
-    url: "/settings/about",
-    description: "About Vox and version information",
-    icon: IconInfoCircle,
     type: "settings",
   },
 ];
