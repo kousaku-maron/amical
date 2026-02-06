@@ -220,6 +220,8 @@ export class OnboardingService extends EventEmitter {
 
       await this.saveOnboardingState(completeState);
 
+      await this.setDefaultModeSpeechModelIfMissing();
+
       // Track completion event
       this.telemetryService.trackOnboardingCompleted({
         version: completeState.completedVersion,
@@ -231,6 +233,28 @@ export class OnboardingService extends EventEmitter {
     } catch (error) {
       logger.main.error("Failed to complete onboarding:", error);
       throw error;
+    }
+  }
+
+  private async setDefaultModeSpeechModelIfMissing(): Promise<void> {
+    try {
+      const defaultSpeechModel =
+        await this.settingsService.getDefaultSpeechModel();
+      if (!defaultSpeechModel) return;
+
+      const { items } = await this.settingsService.getModes();
+      const defaultMode = items.find((mode) => mode.id === "default");
+      if (!defaultMode || defaultMode.speechModelId) return;
+
+      await this.settingsService.updateMode(defaultMode.id, {
+        speechModelId: defaultSpeechModel,
+      });
+
+      logger.main.info("Set default mode speech model", {
+        modelId: defaultSpeechModel,
+      });
+    } catch (error) {
+      logger.main.warn("Failed to set default mode speech model", error);
     }
   }
 
