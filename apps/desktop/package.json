@@ -1,12 +1,12 @@
 {
   "name": "@amical/desktop",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Grizzo Desktop app",
   "main": ".vite/build/main.js",
   "productName": "Grizzo",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kousaku-maron/amical"
+    "url": "https://github.com/kousaku-maron/Grizzo"
   },
   "author": {
     "name": "maron",
