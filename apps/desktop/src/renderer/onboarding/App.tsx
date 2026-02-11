@@ -29,6 +29,8 @@ interface PermissionStatus {
  * Implements T026, T027, T028, T029 - Navigation & State Machine
  */
 export function App() {
+  const dragRegion = { WebkitAppRegion: "drag" } as React.CSSProperties;
+
   // State management
   const [currentScreen, setCurrentScreen] = useState<OnboardingScreen>(
     OnboardingScreen.Welcome,
@@ -265,10 +267,7 @@ export function App() {
   // Render welcome screen
   const renderWelcomeScreen = () => {
     return (
-      <WelcomeScreen
-        onStart={navigateNext}
-        cardHolderName={cardHolderName}
-      />
+      <WelcomeScreen onStart={navigateNext} cardHolderName={cardHolderName} />
     );
   };
 
@@ -313,13 +312,34 @@ export function App() {
 
   const showProgressIndicator = currentScreen !== OnboardingScreen.Welcome;
   const isWelcomeScreen = currentScreen === OnboardingScreen.Welcome;
+  const useGradientBackground =
+    currentScreen === OnboardingScreen.Permissions ||
+    currentScreen === OnboardingScreen.DiscoverySource ||
+    currentScreen === OnboardingScreen.ModelSelection ||
+    currentScreen === OnboardingScreen.Completion;
+  const appBackgroundClass = useGradientBackground
+    ? "bg-[radial-gradient(70%_55%_at_16%_18%,rgba(74,104,173,0.28),transparent_70%),radial-gradient(52%_52%_at_82%_20%,rgba(30,155,158,0.17),transparent_72%),linear-gradient(160deg,#10161d_0%,#090d12_58%,#06080b_100%)]"
+    : "bg-background";
 
   return (
     <OnboardingErrorBoundary>
-      <div className="h-screen w-screen bg-background text-foreground">
+      <div
+        className={`h-screen w-screen text-foreground ${appBackgroundClass}`}
+      >
+        {/* Drag Region for Welcome screen */}
+        {!showProgressIndicator && (
+          <div
+            className="fixed left-0 right-0 top-0 z-50 h-10"
+            style={dragRegion}
+          />
+        )}
+
         {/* Progress Indicator (T029) */}
         {showProgressIndicator && (
-          <div className="fixed left-0 right-0 top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div
+            className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-transparent"
+            style={dragRegion}
+          >
             <div className="mx-auto max-w-2xl px-8 pb-4 pt-6">
               <ProgressIndicator
                 current={getCurrentScreenIndex() + 1}
@@ -330,7 +350,9 @@ export function App() {
         )}
 
         {/* Screen Content */}
-        <div className="h-full overflow-auto pt-20">
+        <div
+          className={`h-full overflow-auto ${showProgressIndicator ? "pt-20" : "pt-0"}`}
+        >
           {isWelcomeScreen ? renderWelcomeScreen() : renderStepScreen()}
         </div>
       </div>

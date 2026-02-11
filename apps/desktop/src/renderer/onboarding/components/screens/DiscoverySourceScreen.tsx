@@ -80,6 +80,11 @@ export function DiscoverySourceScreen({
     <OnboardingLayout
       title="How did you discover Grizzo?"
       subtitle="This helps us understand where our users come from"
+      headerSpacingClassName="mb-12"
+      topSpacingClassName="pt-8"
+      contentFrame={false}
+      contentClassName="mx-auto w-full max-w-[760px]"
+      className="bg-transparent"
       footer={
         <NavigationButtons
           onBack={onBack}
@@ -91,16 +96,20 @@ export function DiscoverySourceScreen({
         />
       }
     >
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-[760px] space-y-5">
         {/* Discovery Sources */}
         <RadioGroup
           value={selectedSource || ""}
           onValueChange={(value) => setSelectedSource(value as DiscoverySource)}
-          className="space-y-3"
+          className="mx-auto w-full max-w-[300px] space-y-3"
         >
           {sources.map((source) => (
             <div key={source.id} className="flex items-center space-x-3">
-              <RadioGroupItem value={source.id} id={source.id} />
+              <RadioGroupItem
+                value={source.id}
+                id={source.id}
+                className="border-white/40"
+              />
               <Label
                 htmlFor={source.id}
                 className="flex-1 cursor-pointer font-normal"
@@ -113,7 +122,7 @@ export function DiscoverySourceScreen({
 
         {/* Other Details Input */}
         {selectedSource === DiscoverySource.Other && (
-          <div className="space-y-2">
+          <div className="mx-auto w-full max-w-[540px] space-y-2">
             <Label htmlFor="other-details">Please specify</Label>
             <Input
               id="other-details"
