@@ -621,7 +621,7 @@ const config: ForgeConfig = {
     new PublisherGithub({
       repository: {
         owner: "kousaku-maron",
-        name: "amical",
+        name: "Grizzo",
       },
       prerelease: true,
       draft: true, // Create draft releases first for review
