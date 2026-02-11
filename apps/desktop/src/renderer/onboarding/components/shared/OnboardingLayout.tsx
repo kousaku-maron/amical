@@ -7,6 +7,11 @@ interface OnboardingLayoutProps {
   title?: string;
   titleIcon?: React.ReactNode;
   subtitle?: string;
+  headerSpacingClassName?: string;
+  topSpacingClassName?: string;
+  contentFrame?: boolean;
+  contentVerticalCenter?: boolean;
+  contentClassName?: string;
   className?: string;
 }
 
@@ -20,6 +25,11 @@ export function OnboardingLayout({
   title,
   titleIcon,
   subtitle,
+  headerSpacingClassName = "mb-4",
+  topSpacingClassName,
+  contentFrame = true,
+  contentVerticalCenter = false,
+  contentClassName,
   className,
 }: OnboardingLayoutProps) {
   return (
@@ -30,25 +40,42 @@ export function OnboardingLayout({
       )}
     >
       {/* Scrollable content area */}
-      <div className="flex-1 w-full max-w-3xl overflow-auto">
-        {/* Header */}
-        {(title || subtitle) && (
-          <div className="mb-4 text-center">
-            {title && (
-              <h1 className="flex items-center justify-center gap-2 text-2xl font-bold tracking-tight text-foreground">
-                {titleIcon}
-                {title}
-              </h1>
-            )}
-            {subtitle && (
-              <p className="mt-2 text-base text-muted-foreground">{subtitle}</p>
-            )}
-          </div>
+      <div
+        className={cn(
+          "flex-1 w-full max-w-3xl overflow-auto",
+          contentVerticalCenter && "flex flex-col",
+          topSpacingClassName,
         )}
+      >
+        <div className={cn(contentVerticalCenter && "my-auto")}>
+          {/* Header */}
+          {(title || subtitle) && (
+            <div className={cn("text-center", headerSpacingClassName)}>
+              {title && (
+                <h1 className="flex items-center justify-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+                  {titleIcon}
+                  {title}
+                </h1>
+              )}
+              {subtitle && (
+                <p className="mt-2 text-base text-muted-foreground">
+                  {subtitle}
+                </p>
+              )}
+            </div>
+          )}
 
-        {/* Content */}
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          {children}
+          {/* Content */}
+          <div
+            className={cn(
+              contentFrame
+                ? "rounded-lg border bg-card p-4 shadow-sm"
+                : "p-0 border-0 bg-transparent shadow-none",
+              contentClassName,
+            )}
+          >
+            {children}
+          </div>
         </div>
       </div>
 

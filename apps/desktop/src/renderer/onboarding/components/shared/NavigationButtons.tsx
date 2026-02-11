@@ -14,6 +14,7 @@ interface NavigationButtonsProps {
   disableComplete?: boolean;
   nextLabel?: string;
   completeLabel?: string;
+  showCompleteIcon?: boolean;
   className?: string;
 }
 
@@ -32,6 +33,7 @@ export function NavigationButtons({
   disableComplete = false,
   nextLabel = "Next",
   completeLabel = "Complete",
+  showCompleteIcon = true,
   className,
 }: NavigationButtonsProps) {
   return (
@@ -76,7 +78,7 @@ export function NavigationButtons({
             className="gap-2"
             type="button"
           >
-            <Check className="h-4 w-4" />
+            {showCompleteIcon && <Check className="h-4 w-4" />}
             {completeLabel}
           </Button>
         )}

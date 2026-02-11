@@ -6,7 +6,7 @@ import {
   CheckCircle,
   AlertCircle,
   Mic,
-  Accessibility,
+  Keyboard,
   ExternalLink,
   RefreshCw,
 } from "lucide-react";
@@ -93,8 +93,8 @@ export function PermissionsScreen({
       case "granted":
         return {
           icon: CheckCircle,
-          color: "text-green-500",
-          bg: "bg-green-500/10",
+          color: "text-emerald-600 dark:text-emerald-500",
+          bg: "bg-white/10",
         };
       case "denied":
         return {
@@ -104,9 +104,9 @@ export function PermissionsScreen({
         };
       default:
         return {
-          icon: RefreshCw,
-          color: "text-blue-500",
-          bg: "bg-blue-500/10",
+          icon: AlertCircle,
+          color: "text-red-400",
+          bg: "bg-white/10",
         };
     }
   };
@@ -115,14 +115,14 @@ export function PermissionsScreen({
     if (permissions.accessibility) {
       return {
         icon: CheckCircle,
-        color: "text-green-500",
-        bg: "bg-green-500/10",
+        color: "text-emerald-600 dark:text-emerald-500",
+        bg: "bg-white/10",
       };
     } else {
       return {
         icon: AlertCircle,
-        color: "text-yellow-500",
-        bg: "bg-yellow-500/10",
+        color: "text-red-400",
+        bg: "bg-white/10",
       };
     }
   };
@@ -136,60 +136,52 @@ export function PermissionsScreen({
     <OnboardingLayout
       title="Setup Permissions"
       subtitle="Grizzo needs a few permissions to work properly"
+      headerSpacingClassName="mb-12"
+      topSpacingClassName="pt-8"
+      contentFrame={false}
+      contentClassName="mx-auto w-full max-w-[760px]"
+      className="bg-transparent"
       footer={
         <NavigationButtons
           onBack={onBack}
           onNext={onNext}
           disableNext={!allPermissionsGranted}
-          nextLabel={allPermissionsGranted ? "Next" : "Waiting for permissions..."}
+          nextLabel={
+            allPermissionsGranted ? "Next" : "Waiting for permissions..."
+          }
         />
       }
     >
-      <div className="space-y-6">
-        {/* Status Summary */}
-        {allPermissionsGranted && (
-          <Card className="border-green-500 bg-green-500/10 p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="font-medium text-green-900 dark:text-green-100">
-                  All permissions granted
-                </p>
-                <p className="text-sm text-green-800 dark:text-green-200">
-                  You're all set! You can continue to the next step.
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
-
+      <div className="mx-auto w-full max-w-[760px] space-y-5">
         {/* Polling Status */}
         {isPolling && !allPermissionsGranted && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <RefreshCw className="h-4 w-4 animate-spin" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm text-zinc-300">
+            <RefreshCw className="h-4 w-4 animate-spin text-zinc-200" />
             <span>Checking for permission changes...</span>
           </div>
         )}
 
         {/* Permission Cards */}
-        <div className="space-y-4">
+        <div className="mx-auto w-full max-w-[540px] space-y-4">
           {/* Microphone Permission */}
-          <Card className="p-6">
-            <div className="flex items-start justify-between">
+          <Card className="border-white/15 bg-black/20 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+            <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className={`mt-1 rounded-lg p-2 ${micStatus.bg}`}>
-                  <Mic className={`h-5 w-5 ${micStatus.color}`} />
+                <div className="mt-1 rounded-lg bg-white/8 p-2">
+                  <Mic className="h-5 w-5 text-zinc-200" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Microphone Access</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <h3 className="font-medium text-zinc-100">
+                    Microphone Access
+                  </h3>
+                  <p className="mt-1 text-sm text-zinc-300">
                     Required for recording and transcribing audio
                   </p>
 
                   {permissions.microphone === "granted" && (
                     <div className="mt-2 flex items-center gap-2">
                       <MicIcon className={`h-4 w-4 ${micStatus.color}`} />
-                      <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                      <span className="text-sm font-medium text-emerald-600 dark:text-emerald-500">
                         Permission granted
                       </span>
                     </div>
@@ -199,11 +191,11 @@ export function PermissionsScreen({
                     <div className="mt-2 space-y-2">
                       <div className="flex items-center gap-2">
                         <MicIcon className={`h-4 w-4 ${micStatus.color}`} />
-                        <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                        <span className="text-sm font-medium text-red-400">
                           Permission denied
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-zinc-300">
                         Please grant microphone access in System Preferences
                       </p>
                     </div>
@@ -212,8 +204,8 @@ export function PermissionsScreen({
                   {permissions.microphone === "not-determined" && (
                     <div className="mt-2 flex items-center gap-2">
                       <MicIcon className={`h-4 w-4 ${micStatus.color}`} />
-                      <span className="text-sm font-medium">
-                        Permission not yet requested
+                      <span className="text-sm font-medium text-red-400">
+                        Permission required
                       </span>
                     </div>
                   )}
@@ -221,29 +213,33 @@ export function PermissionsScreen({
               </div>
 
               {permissions.microphone !== "granted" && (
-                <div className="flex flex-col gap-2">
-                  {permissions.microphone === "not-determined" && (
-                    <Button
-                      onClick={handleRequestMicrophone}
-                      disabled={isRequestingMic}
-                      size="sm"
-                      variant="default"
-                    >
-                      {isRequestingMic ? "Requesting..." : "Request Permission"}
-                    </Button>
-                  )}
+                <div className="pl-12">
+                  <div className="flex flex-col items-start gap-2">
+                    {permissions.microphone === "not-determined" && (
+                      <Button
+                        onClick={handleRequestMicrophone}
+                        disabled={isRequestingMic}
+                        size="sm"
+                        variant="default"
+                      >
+                        {isRequestingMic
+                          ? "Requesting..."
+                          : "Request Permission"}
+                      </Button>
+                    )}
 
-                  {permissions.microphone === "denied" && (
-                    <Button
-                      onClick={handleOpenMicrophoneSettings}
-                      size="sm"
-                      variant="outline"
-                      className="gap-2"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Open Settings
-                    </Button>
-                  )}
+                    {permissions.microphone === "denied" && (
+                      <Button
+                        onClick={handleOpenMicrophoneSettings}
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open Settings
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -251,15 +247,17 @@ export function PermissionsScreen({
 
           {/* Accessibility Permission (macOS only) */}
           {platform === "darwin" && (
-            <Card className="p-6">
-              <div className="flex items-start justify-between">
+            <Card className="border-white/15 bg-black/20 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+              <div className="space-y-4">
                 <div className="flex items-start gap-3">
-                  <div className={`mt-1 rounded-lg p-2 ${accStatus.bg}`}>
-                    <Accessibility className={`h-5 w-5 ${accStatus.color}`} />
+                  <div className="mt-1 rounded-lg bg-white/8 p-2">
+                    <Keyboard className="h-5 w-5 text-zinc-200" />
                   </div>
                   <div>
-                    <h3 className="font-medium">Accessibility Access</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <h3 className="font-medium text-zinc-100">
+                      Accessibility Access
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-300">
                       Required for pasting transcription and global keyboard
                       shortcuts (macOS only)
                     </p>
@@ -267,7 +265,7 @@ export function PermissionsScreen({
                     {permissions.accessibility ? (
                       <div className="mt-2 flex items-center gap-2">
                         <AccIcon className={`h-4 w-4 ${accStatus.color}`} />
-                        <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                        <span className="text-sm font-medium text-emerald-600 dark:text-emerald-500">
                           Permission granted
                         </span>
                       </div>
@@ -275,11 +273,11 @@ export function PermissionsScreen({
                       <div className="mt-2 space-y-2">
                         <div className="flex items-center gap-2">
                           <AccIcon className={`h-4 w-4 ${accStatus.color}`} />
-                          <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                          <span className="text-sm font-medium text-red-400">
                             Permission required
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-zinc-300">
                           Add Grizzo to Accessibility in System Preferences
                         </p>
                       </div>
@@ -288,15 +286,17 @@ export function PermissionsScreen({
                 </div>
 
                 {!permissions.accessibility && (
-                  <Button
-                    onClick={handleOpenAccessibility}
-                    size="sm"
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Open Settings
-                  </Button>
+                  <div className="pl-12">
+                    <Button
+                      onClick={handleOpenAccessibility}
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open Settings
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>
