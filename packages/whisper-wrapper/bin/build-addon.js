@@ -211,7 +211,8 @@ function computeVariants(platform, arch) {
     return result;
   }
 
-  if (platform === "darwin") {
+  if (platform === "darwin" && arch === "arm64") {
+    // Metal is only supported on Apple Silicon (arm64)
     const metal = variantFromName(`${platform}-${arch}-metal`, platform, arch);
     if (metal) result.push(metal);
   }
