@@ -1,5 +1,13 @@
 // Worker process entry point for fork
-import { Whisper, getLoadedBindingInfo } from "@amical/whisper-wrapper";
+//
+// IMPORTANT: This file uses dynamic import for @amical/whisper-wrapper
+// to allow diagnostic logging BEFORE the native module is loaded.
+// The static import would be hoisted by Vite and execute before any JS code.
+
+// Phase 0: Very early diagnostic output (before ANY module loading)
+process.stderr.write(
+  `[whisper-worker] STARTUP pid=${process.pid} arch=${process.arch} platform=${process.platform} node=${process.version}\n`,
+);
 
 // Type definitions for IPC communication
 interface WorkerMessage {
@@ -27,12 +35,39 @@ const logger = {
   },
 };
 
-let whisperInstance: Whisper | null = null;
+// Module-level references (populated by dynamic import)
+let Whisper: any = null;
+let getLoadedBindingInfo: any = null;
+let moduleLoaded = false;
+
+async function loadWhisperModule(): Promise<void> {
+  if (moduleLoaded) return;
+  process.stderr.write("[whisper-worker] Loading @amical/whisper-wrapper...\n");
+  try {
+    const mod = await import("@amical/whisper-wrapper");
+    Whisper = mod.Whisper;
+    getLoadedBindingInfo = mod.getLoadedBindingInfo;
+    moduleLoaded = true;
+    process.stderr.write(
+      "[whisper-worker] @amical/whisper-wrapper loaded successfully\n",
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[whisper-worker] FATAL: Failed to load @amical/whisper-wrapper: ${err}\n`,
+    );
+    throw err;
+  }
+}
+
+let whisperInstance: any = null;
 let currentModelPath: string | null = null;
 
 // Worker methods
 const methods = {
   async initializeModel(modelPath: string): Promise<void> {
+    // Ensure the native module is loaded
+    await loadWhisperModule();
+
     if (whisperInstance && currentModelPath === modelPath) {
       return; // Already initialized with same model
     }
@@ -107,7 +142,7 @@ const methods = {
   },
 
   getBindingInfo(): { path: string; type: string } | null {
-    return getLoadedBindingInfo();
+    return getLoadedBindingInfo ? getLoadedBindingInfo() : null;
   },
 };
 
@@ -151,4 +186,4 @@ process.on("message", async (message: WorkerMessage) => {
 });
 
 // Send ready signal
-logger.transcription.info("Worker process started");
+logger.transcription.info("Worker process started, awaiting commands");

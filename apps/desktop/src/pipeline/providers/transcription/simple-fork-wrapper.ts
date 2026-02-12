@@ -34,7 +34,9 @@ export class SimpleForkWrapper {
   async initialize(): Promise<void> {
     if (this.worker) return;
 
-    logger.transcription.info(`Starting worker process: ${this.workerPath}`);
+    logger.transcription.info(
+      `Starting worker process: ${this.workerPath} (execPath: ${this.nodeBinaryPath})`,
+    );
 
     // When packaged, we need to extract the worker to a temp file
     // because fork needs an actual file path, not an asar path
@@ -62,6 +64,16 @@ export class SimpleForkWrapper {
       env: workerEnv,
       silent: true,
       cwd: app.isPackaged ? process.resourcesPath : process.cwd(),
+    });
+
+    // Capture worker stdout/stderr for diagnostics
+    this.worker.stdout?.on("data", (data: Buffer) => {
+      const text = data.toString().trim();
+      if (text) logger.transcription.info(`[worker stdout] ${text}`);
+    });
+    this.worker.stderr?.on("data", (data: Buffer) => {
+      const text = data.toString().trim();
+      if (text) logger.transcription.warn(`[worker stderr] ${text}`);
     });
 
     this.worker.on("message", (message: WorkerResponse) => {
