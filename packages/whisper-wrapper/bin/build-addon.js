@@ -190,6 +190,11 @@ function variantFromName(name, platform, arch) {
   }
   if (name.startsWith("darwin-")) {
     envOverrides.GGML_USE_ACCELERATE = envOverrides.GGML_USE_ACCELERATE || "1";
+    // Explicitly disable Metal for non-Metal darwin variants.
+    // whisper.cpp CMake auto-enables Metal on macOS, which crashes on Intel GPUs.
+    if (!name.includes("-metal")) {
+      envOverrides.GGML_METAL = "OFF";
+    }
   }
 
   return { name, env: envOverrides };
