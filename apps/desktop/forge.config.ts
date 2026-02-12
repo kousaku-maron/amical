@@ -445,7 +445,7 @@ const config: ForgeConfig = {
               // so we must match the packaged path (Resources/node), not the source path.
               if (
                 filePath.includes("node-binaries") ||
-                filePath.endsWith("/node")
+                filePath.endsWith("/Resources/node")
               ) {
                 return {
                   entitlements: "./entitlements.node.plist",
