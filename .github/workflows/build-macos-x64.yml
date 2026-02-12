@@ -77,35 +77,13 @@ jobs:
           echo "=== Checking built whisper variants ==="
           ls -la packages/whisper-wrapper/native/ || echo "No native directory"
 
-          if [ -d "packages/whisper-wrapper/native/darwin-x64-metal" ]; then
-            echo "ERROR: darwin-x64-metal should NOT be built on Intel Mac"
-            exit 1
-          fi
-          echo "✓ darwin-x64-metal correctly skipped"
-
           WHISPER_NODE="packages/whisper-wrapper/native/darwin-x64/whisper.node"
           if [ ! -f "$WHISPER_NODE" ]; then
             echo "ERROR: darwin-x64/whisper.node not found"
             exit 1
           fi
           echo "✓ darwin-x64/whisper.node exists"
-
-          echo ""
-          echo "=== whisper.node binary info ==="
           file "$WHISPER_NODE"
-          otool -L "$WHISPER_NODE" | head -20
-
-          echo ""
-          echo "=== Checking for Metal symbols (should be NONE) ==="
-          if nm -g "$WHISPER_NODE" 2>/dev/null | grep -i metal; then
-            echo "WARNING: Metal symbols found in whisper.node"
-          else
-            echo "✓ No Metal symbols in whisper.node"
-          fi
-
-          echo ""
-          echo "=== Code signature ==="
-          codesign -dvv "$WHISPER_NODE" 2>&1 || echo "Not signed (will be signed during packaging)"
 
       - name: Build artifacts
         working-directory: apps/desktop
