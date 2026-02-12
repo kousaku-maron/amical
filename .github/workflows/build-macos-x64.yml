@@ -140,6 +140,14 @@ jobs:
             file "$NODE_BIN"
             echo "--- Entitlements ---"
             codesign -d --entitlements - "$NODE_BIN" 2>&1 || echo "No entitlements"
+            echo ""
+            echo "--- Verifying JIT entitlement (REQUIRED for Intel Mac) ---"
+            if codesign -d --entitlements - "$NODE_BIN" 2>&1 | grep -q "allow-jit"; then
+              echo "✓ com.apple.security.cs.allow-jit is present"
+            else
+              echo "ERROR: com.apple.security.cs.allow-jit is MISSING - V8 JIT will crash on Intel Mac"
+              exit 1
+            fi
           else
             echo "WARNING: node binary not found at $NODE_BIN"
           fi

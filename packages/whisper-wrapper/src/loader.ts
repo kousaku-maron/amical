@@ -4,16 +4,8 @@ import fs from "node:fs";
 const GPU_FIRST_CANDIDATES = ["metal", "openblas", "cuda", "vulkan"] as const;
 
 function candidateDirs(platform: string, arch: string): string[] {
-  const candidates = GPU_FIRST_CANDIDATES.filter((tag) => {
-    // Metal is only supported on Apple Silicon (arm64)
-    if (tag === "metal" && (platform !== "darwin" || arch !== "arm64")) {
-      return false;
-    }
-    return true;
-  });
-
   return [
-    ...candidates.map((tag) => `${platform}-${arch}-${tag}`),
+    ...GPU_FIRST_CANDIDATES.map((tag) => `${platform}-${arch}-${tag}`),
     `${platform}-${arch}`,
     "cpu-fallback",
   ];
