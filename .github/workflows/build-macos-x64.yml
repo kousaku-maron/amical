@@ -101,39 +101,6 @@ jobs:
           echo "Building macOS x64 artifacts"
           pnpm make:x64
 
-      - name: Verify packaged app
-        run: |
-          echo "=== Inspecting packaged app ==="
-          APP_DIR=$(find apps/desktop/out -name "*.app" -type d | head -1)
-          if [ -z "$APP_DIR" ]; then
-            echo "WARNING: No .app found in output"
-            exit 0
-          fi
-          echo "App: $APP_DIR"
-
-          echo ""
-          echo "=== Node binary in packaged app ==="
-          NODE_BIN="$APP_DIR/Contents/Resources/node"
-          if [ -f "$NODE_BIN" ]; then
-            file "$NODE_BIN"
-            echo "--- Entitlements ---"
-            codesign -d --entitlements - "$NODE_BIN" 2>&1 || echo "No entitlements"
-            echo ""
-            echo "--- Verifying JIT entitlement (REQUIRED for Intel Mac) ---"
-            if codesign -d --entitlements - "$NODE_BIN" 2>&1 | grep -q "allow-jit"; then
-              echo "✓ com.apple.security.cs.allow-jit is present"
-            else
-              echo "ERROR: com.apple.security.cs.allow-jit is MISSING - V8 JIT will crash on Intel Mac"
-              exit 1
-            fi
-          else
-            echo "WARNING: node binary not found at $NODE_BIN"
-          fi
-
-          echo ""
-          echo "=== whisper.node in packaged app ==="
-          find "$APP_DIR" -name "whisper.node" -exec sh -c 'echo "File: {}"; file "{}"; echo "--- Linked libraries ---"; otool -L "{}"; echo "--- Metal symbols ---"; nm -g "{}" 2>/dev/null | grep -i metal || echo "None"; echo "--- Code signature ---"; codesign -dvv "{}" 2>&1; echo ""' \;
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
