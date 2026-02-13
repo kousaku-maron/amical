@@ -3,7 +3,7 @@ name: Build macOS x64
 on:
   push:
     branches:
-      - "fix/intel-macos"
+      - "x/build-macos-x64"
 
 jobs:
   build:
