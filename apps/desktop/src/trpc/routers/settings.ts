@@ -143,6 +143,7 @@ export const settingsRouter = createRouter({
         enablePunctuation: z.boolean().optional(),
         enableTimestamps: z.boolean().optional(),
         preloadWhisperModel: z.boolean().optional(),
+        useGPU: z.boolean().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {

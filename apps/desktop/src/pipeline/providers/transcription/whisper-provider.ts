@@ -50,9 +50,19 @@ export class WhisperProvider implements TranscriptionProvider {
   private readonly SPEECH_PROBABILITY_THRESHOLD = 0.2; // Threshold for speech detection
   private readonly IGNORE_FULLY_SILENT_CHUNKS = true;
 
-  constructor(modelService: ModelService, preferredModelId?: string) {
+  private useGPU: boolean;
+
+  constructor(
+    modelService: ModelService,
+    preferredModelId?: string,
+    useGPU?: boolean,
+  ) {
     this.modelService = modelService;
     this.preferredModelId = preferredModelId;
+    // Default: GPU ON for Apple Silicon Mac, OFF otherwise
+    this.useGPU =
+      useGPU ??
+      (process.platform === "darwin" && process.arch === "arm64");
   }
 
   /**
@@ -341,6 +351,7 @@ export class WhisperProvider implements TranscriptionProvider {
       this.workerWrapper = new SimpleForkWrapper(
         workerPath,
         this.getNodeBinaryPath(),
+        { WHISPER_USE_GPU: this.useGPU ? "1" : "0" },
       );
 
       await this.workerWrapper.initialize();

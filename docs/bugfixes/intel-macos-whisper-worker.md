@@ -157,3 +157,25 @@ whisper.cpp の CMake は macOS 上で `GGML_METAL` をデフォルトで有効�
 2. **SIGTRAP の原因は多様**: Metal だけでなく V8 JIT の `mprotect` 失敗でも SIGTRAP が発生する。stderr のキャプチャが調査の鍵。
 3. **Metal ≠ Apple GPU 全般**: Metal API 自体は Intel GPU でも動作するが、whisper.cpp の compute shaders は Apple Silicon 専用に最適化されている。`dlopen` 成功後の GPU 初期化タイムアウトは `require()` のフォールバック機構では捕捉できない。
 4. **Hardened Runtime の W^X は x86_64 特有の問題**: arm64 では `MAP_JIT` API を使うため影響しない。x86_64 のみ `com.apple.security.cs.allow-jit` が必須。
+
+## 現在の制限事項と今後の方針
+
+### 現状
+
+修正2 により `loader.ts` で Metal を `darwin-arm64` 以外でハードコードスキップしている。
+これにより Intel Mac は **CPU 版のみ** で動作する。
+
+### 課題
+
+- Metal API 自体は Intel GPU でも `dlopen` 成功するため、GPU のスペック次第では動作する可能性がある（例: Radeon 搭載の MacBook Pro 15/16 インチ）
+- 現状のハードコードスキップでは、そうした機種でも一律 GPU を使えない
+
+### 今後の方針: Settings に GPU スイッチを追加
+
+Intel Mac のハードコードスキップを廃止し、**Settings UI に「GPU を利用する」スイッチ**を追加する。
+
+- **デフォルト: OFF**（CPU 版で確実に動作）
+- ユーザーが明示的に ON にすると Metal 経由で GPU を利用
+- 動作しなければユーザー自身で OFF に戻せる
+
+この方針は Windows 版（Vulkan）と共通。詳細は `docs/bugfixes/windows-whisper-gpu.md` を参照。

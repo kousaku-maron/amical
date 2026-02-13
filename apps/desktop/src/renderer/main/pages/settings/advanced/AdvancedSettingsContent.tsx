@@ -34,6 +34,11 @@ export function AdvancedSettingsContent({
   className,
   showHeader = true,
 }: AdvancedSettingsContentProps) {
+  // Apple Silicon Mac defaults to GPU ON, everything else defaults to OFF
+  const isAppleSilicon =
+    window.electronAPI.platform === "darwin" &&
+    window.electronAPI.arch === "arm64";
+  const [useGPU, setUseGPU] = useState(isAppleSilicon);
   const [preloadWhisperModel, setPreloadWhisperModel] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -100,8 +105,19 @@ export function AdvancedSettingsContent({
       setPreloadWhisperModel(
         settingsQuery.data.transcription.preloadWhisperModel !== false,
       );
+      // undefined means user hasn't set it yet — use platform default
+      setUseGPU(
+        settingsQuery.data.transcription.useGPU ?? isAppleSilicon,
+      );
     }
   }, [settingsQuery.data]);
+
+  const handleUseGPUChange = (checked: boolean) => {
+    setUseGPU(checked);
+    updateTranscriptionSettingsMutation.mutate({
+      useGPU: checked,
+    });
+  };
 
   const handlePreloadWhisperModelChange = (checked: boolean) => {
     setPreloadWhisperModel(checked);
@@ -154,6 +170,28 @@ export function AdvancedSettingsContent({
               id="preload-whisper"
               checked={preloadWhisperModel}
               onCheckedChange={handlePreloadWhisperModelChange}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label
+                htmlFor="gpu-acceleration"
+                className="text-base font-medium text-foreground"
+              >
+                GPU Acceleration
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Use GPU for faster speech recognition (Metal on macOS, Vulkan on
+                Windows). Requires restart.
+              </p>
+            </div>
+            <Switch
+              id="gpu-acceleration"
+              checked={useGPU}
+              onCheckedChange={handleUseGPUChange}
             />
           </div>
 

@@ -144,6 +144,7 @@ export interface AppSettingsData {
     enablePunctuation: boolean;
     enableTimestamps: boolean;
     preloadWhisperModel?: boolean;
+    useGPU?: boolean; // undefined = platform default (ON for Apple Silicon, OFF otherwise)
   };
   recording?: {
     defaultFormat: "wav" | "mp3" | "flac";

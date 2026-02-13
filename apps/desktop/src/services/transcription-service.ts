@@ -37,7 +37,7 @@ const TRANSCRIPTION_API_ENDPOINTS: Record<string, string> = {
  * Service for audio transcription and optional formatting
  */
 export class TranscriptionService {
-  private whisperProvider: WhisperProvider;
+  private whisperProvider: WhisperProvider | null = null;
   private whisperProvidersByModelId = new Map<string, WhisperProvider>();
   private apiProviders = new Map<string, OpenAITranscriptionProvider>();
   private currentProvider: TranscriptionProvider | null = null;
@@ -51,6 +51,8 @@ export class TranscriptionService {
   private modelService: ModelService;
   private modelWasPreloaded: boolean = false;
 
+  private resolvedUseGPU: boolean | undefined;
+
   constructor(
     modelService: ModelService,
     vadService: VADService,
@@ -59,7 +61,6 @@ export class TranscriptionService {
     private nativeBridge: NativeBridge | null,
     private onboardingService: OnboardingService | null,
   ) {
-    this.whisperProvider = new WhisperProvider(modelService);
     this.vadService = vadService;
     this.settingsService = settingsService;
     this.vadMutex = new Mutex();
@@ -69,13 +70,35 @@ export class TranscriptionService {
     this.modelService = modelService;
   }
 
-  private getOrCreateWhisperProvider(modelId: string): WhisperProvider {
+  private async getDefaultWhisperProvider(): Promise<WhisperProvider> {
+    if (this.whisperProvider) return this.whisperProvider;
+    const useGPU = await this.resolveUseGPU();
+    this.whisperProvider = new WhisperProvider(
+      this.modelService,
+      undefined,
+      useGPU,
+    );
+    return this.whisperProvider;
+  }
+
+  private async resolveUseGPU(): Promise<boolean | undefined> {
+    if (this.resolvedUseGPU !== undefined) return this.resolvedUseGPU;
+    const transcriptionSettings =
+      await this.settingsService.getTranscriptionSettings();
+    this.resolvedUseGPU = transcriptionSettings?.useGPU;
+    return this.resolvedUseGPU;
+  }
+
+  private async getOrCreateWhisperProvider(
+    modelId: string,
+  ): Promise<WhisperProvider> {
     const cached = this.whisperProvidersByModelId.get(modelId);
     if (cached) {
       return cached;
     }
 
-    const provider = new WhisperProvider(this.modelService, modelId);
+    const useGPU = await this.resolveUseGPU();
+    const provider = new WhisperProvider(this.modelService, modelId, useGPU);
     this.whisperProvidersByModelId.set(modelId, provider);
     return provider;
   }
@@ -91,8 +114,9 @@ export class TranscriptionService {
 
     if (!effectiveModelId) {
       // Default to whisper if no model selected
-      this.currentProvider = this.whisperProvider;
-      return this.whisperProvider;
+      const defaultProvider = await this.getDefaultWhisperProvider();
+      this.currentProvider = defaultProvider;
+      return defaultProvider;
     }
 
     // Find the model in AVAILABLE_MODELS
@@ -107,14 +131,15 @@ export class TranscriptionService {
 
     // Use model-scoped whisper provider for offline model overrides
     if (model?.setup === "offline" && effectiveModelId) {
-      const provider = this.getOrCreateWhisperProvider(effectiveModelId);
+      const provider = await this.getOrCreateWhisperProvider(effectiveModelId);
       this.currentProvider = provider;
       return provider;
     }
 
     // Fallback to default whisper provider (best available local model)
-    this.currentProvider = this.whisperProvider;
-    return this.whisperProvider;
+    const defaultProvider = await this.getDefaultWhisperProvider();
+    this.currentProvider = defaultProvider;
+    return defaultProvider;
   }
 
   private async getOrCreateApiProvider(
@@ -291,7 +316,7 @@ export class TranscriptionService {
 
     for (const modelId of modelIds) {
       try {
-        const provider = this.getOrCreateWhisperProvider(modelId);
+        const provider = await this.getOrCreateWhisperProvider(modelId);
         await provider.preloadModel();
         loadedCount++;
         logger.transcription.info("Preloaded mode Whisper model", { modelId });
@@ -305,7 +330,8 @@ export class TranscriptionService {
 
     if (preloadFallbackProvider) {
       try {
-        await this.whisperProvider.preloadModel();
+        const defaultProvider = await this.getDefaultWhisperProvider();
+        await defaultProvider.preloadModel();
         loadedCount++;
         logger.transcription.info("Preloaded fallback Whisper model");
       } catch (error) {
@@ -1034,7 +1060,7 @@ export class TranscriptionService {
    * Cleanup method
    */
   async dispose(): Promise<void> {
-    await this.whisperProvider.dispose();
+    await this.whisperProvider?.dispose();
     this.apiProviders.clear();
     // VAD service is managed by ServiceManager
     logger.transcription.info("Transcription service disposed");
