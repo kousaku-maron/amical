@@ -97,13 +97,13 @@ app.whenReady().then(async () => {
 
     if (prefs.autoUpdate) {
       if (!isWindows()) {
-        updateElectronApp({ notifyUser: false });
+        updateElectronApp({ notifyUser: true });
       } else {
         const isSquirrelFirstRun =
           process.argv.includes("--squirrel-firstrun");
         if (!isSquirrelFirstRun) {
           setTimeout(
-            () => updateElectronApp({ notifyUser: false }),
+            () => updateElectronApp({ notifyUser: true }),
             60000,
           );
         }
