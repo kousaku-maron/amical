@@ -1,10 +1,18 @@
-import { app } from "electron";
+import { autoUpdater } from "electron";
 import { EventEmitter } from "events";
 import { logger } from "../logger";
 
 export class AutoUpdaterService extends EventEmitter {
+  private updateDownloaded = false;
+
   constructor() {
     super();
+    autoUpdater.on("update-downloaded", () => {
+      logger.updater.info(
+        "Update downloaded and ready to install on next restart",
+      );
+      this.updateDownloaded = true;
+    });
   }
 
   // These methods are kept for compatibility with existing code
@@ -30,6 +38,10 @@ export class AutoUpdaterService extends EventEmitter {
     return false; // Handled by update-electron-app
   }
 
+  isUpdateDownloaded(): boolean {
+    return this.updateDownloaded;
+  }
+
   async downloadUpdate(): Promise<void> {
     logger.updater.info(
       "Download update requested, handled by update-electron-app",
@@ -37,9 +49,11 @@ export class AutoUpdaterService extends EventEmitter {
   }
 
   quitAndInstall(): void {
-    logger.updater.info(
-      "Quit and install requested, handled by update-electron-app",
-    );
-    app.quit();
+    if (!this.updateDownloaded) {
+      logger.updater.warn("No update downloaded, ignoring quitAndInstall");
+      return;
+    }
+    logger.updater.info("Quit and install requested");
+    autoUpdater.quitAndInstall();
   }
 }

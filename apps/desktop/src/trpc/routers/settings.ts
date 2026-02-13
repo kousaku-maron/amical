@@ -108,6 +108,7 @@ const AppPreferencesSchema = z.object({
   minimizeToTray: z.boolean().optional(),
   showWidgetWhileInactive: z.boolean().optional(),
   showInDock: z.boolean().optional(),
+  autoUpdate: z.boolean().optional(),
 });
 
 const UIThemeSchema = z.object({

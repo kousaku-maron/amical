@@ -6,6 +6,7 @@ import { logger } from "./logger";
 
 import started from "electron-squirrel-startup";
 import { AppManager } from "./core/app-manager";
+import { ServiceManager } from "./managers/service-manager";
 import { updateElectronApp } from "update-electron-app";
 import { isWindows } from "../utils/platform";
 
@@ -50,25 +51,6 @@ if (!gotTheLock) {
   app.quit();
 }
 
-// Set up auto-updater for production builds
-if (app.isPackaged && !isWindows()) {
-  updateElectronApp({
-    notifyUser: false,
-  });
-}
-if (app.isPackaged && isWindows()) {
-  // Check if running with --squirrel-firstrun (Windows only)
-  const isSquirrelFirstRun = process.argv.includes("--squirrel-firstrun");
-  // Delay update check on Windows to avoid Squirrel file lock issues
-  if (isWindows() && !isSquirrelFirstRun) {
-    setTimeout(() => {
-      updateElectronApp({
-        notifyUser: false,
-      });
-    }, 60000); // 60 second delay
-  }
-}
-
 const appManager = new AppManager();
 
 // Track initialization state for deep link handling
@@ -106,6 +88,28 @@ app.on("second-instance", (_event, commandLine) => {
 app.whenReady().then(async () => {
   await appManager.initialize();
   isInitialized = true;
+
+  // Set up auto-updater for production builds based on user preference
+  if (app.isPackaged) {
+    const serviceManager = ServiceManager.getInstance();
+    const settingsService = serviceManager.getService("settingsService");
+    const prefs = await settingsService.getPreferences();
+
+    if (prefs.autoUpdate) {
+      if (!isWindows()) {
+        updateElectronApp({ notifyUser: false });
+      } else {
+        const isSquirrelFirstRun =
+          process.argv.includes("--squirrel-firstrun");
+        if (!isSquirrelFirstRun) {
+          setTimeout(
+            () => updateElectronApp({ notifyUser: false }),
+            60000,
+          );
+        }
+      }
+    }
+  }
 
   // Process any deep link that was received before initialization completed
   if (pendingDeepLink) {

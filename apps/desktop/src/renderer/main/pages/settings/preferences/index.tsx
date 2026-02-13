@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -58,12 +59,31 @@ export default function PreferencesSettingsPage() {
     });
   };
 
+  const handleAutoUpdateChange = (checked: boolean) => {
+    updatePreferencesMutation.mutate({
+      autoUpdate: checked,
+    });
+  };
+
   const showWidgetWhileInactive =
     preferencesQuery.data?.showWidgetWhileInactive ?? true;
   const minimizeToTray = preferencesQuery.data?.minimizeToTray ?? false;
   const launchAtLogin = preferencesQuery.data?.launchAtLogin ?? true;
   const showInDock = preferencesQuery.data?.showInDock ?? true;
+  const autoUpdate = preferencesQuery.data?.autoUpdate ?? true;
   const isMac = window.electronAPI.platform === "darwin";
+
+  // Poll for update downloaded status
+  const isUpdateDownloadedQuery = api.updater.isUpdateDownloaded.useQuery(
+    undefined,
+    { refetchInterval: 30000 },
+  );
+  const isUpdateDownloaded = isUpdateDownloadedQuery.data ?? false;
+  const quitAndInstallMutation = api.updater.quitAndInstall.useMutation();
+
+  const handleRestartToUpdate = () => {
+    quitAndInstallMutation.mutate();
+  };
 
   return (
     <div className="container mx-auto max-w-5xl px-6 pb-6">
@@ -181,17 +201,29 @@ export default function PreferencesSettingsPage() {
                 {/* Auto Updates Section */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label
-                      htmlFor="auto-update"
-                      className="text-base font-medium text-foreground"
-                    >
+                    <Label className="text-base font-medium text-foreground">
                       Auto Updates
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Automatically check for updates
+                      Automatically check for and install updates
                     </p>
                   </div>
-                  <Switch id="auto-update" defaultChecked />
+                  <div className="flex items-center gap-2">
+                    {isUpdateDownloaded && (
+                      <Button
+                        size="sm"
+                        onClick={handleRestartToUpdate}
+                        disabled={quitAndInstallMutation.isPending}
+                      >
+                        Restart to Update
+                      </Button>
+                    )}
+                    <Switch
+                      checked={autoUpdate}
+                      onCheckedChange={handleAutoUpdateChange}
+                      disabled={updatePreferencesMutation.isPending}
+                    />
+                  </div>
                 </div>
 
                 <Separator />
