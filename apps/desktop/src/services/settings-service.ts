@@ -22,6 +22,7 @@ export interface AppPreferences {
   minimizeToTray: boolean;
   showWidgetWhileInactive: boolean;
   showInDock: boolean;
+  autoUpdate: boolean;
 }
 
 export class SettingsService extends EventEmitter {
@@ -359,6 +360,7 @@ export class SettingsService extends EventEmitter {
       minimizeToTray: preferences?.minimizeToTray ?? true,
       showWidgetWhileInactive: preferences?.showWidgetWhileInactive ?? true,
       showInDock: preferences?.showInDock ?? true,
+      autoUpdate: preferences?.autoUpdate ?? true,
     };
   }
 

@@ -150,6 +150,28 @@ export const updaterRouter = createRouter({
     }
   }),
 
+  // Get whether an update has been downloaded and is ready to install
+  isUpdateDownloaded: procedure.query(async ({ ctx }) => {
+    try {
+      const autoUpdaterService =
+        ctx.serviceManager.getService("autoUpdaterService");
+      if (!autoUpdaterService) {
+        return false;
+      }
+
+      return autoUpdaterService.isUpdateDownloaded();
+    } catch (error) {
+      const logger = ctx.serviceManager.getLogger();
+      logger?.updater.error(
+        "Error getting update downloaded status via tRPC",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return false;
+    }
+  }),
+
   // Subscribe to download progress updates
   // Using Observable instead of async generator due to Symbol.asyncDispose conflict
   // Modern Node.js (20+) adds Symbol.asyncDispose to async generators natively,
