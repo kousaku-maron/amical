@@ -1,0 +1,110 @@
+name: Build macOS x64
+
+on:
+  push:
+    branches:
+      - "x/build-macos-x64"
+
+jobs:
+  build:
+    name: Build macOS (x64)
+    runs-on: macos-15-intel
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify architecture
+        run: |
+          CURRENT_ARCH=$(uname -m)
+          echo "Current shell architecture: $CURRENT_ARCH"
+          echo "Arch command output: $(arch)"
+
+          if [[ "$CURRENT_ARCH" != "x86_64" ]]; then
+            echo "ERROR: Expected x86_64 architecture but got $CURRENT_ARCH"
+            exit 1
+          fi
+          echo "✓ Architecture verified: Running as native x86_64 on Intel hardware"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.1.0"
+          cache: "pnpm"
+
+      - name: Log Node.js architecture and platform
+        run: |
+          echo "=== Node.js Process Information ==="
+          node -e "console.log('process.arch:', process.arch)"
+          node -e "console.log('process.platform:', process.platform)"
+          echo ""
+
+      - name: Install dependencies
+        env:
+          GGML_NATIVE: OFF
+        run: pnpm install --frozen-lockfile
+
+      - name: Build whisper wrapper JS
+        run: pnpm --filter @amical/whisper-wrapper build
+
+      - name: Build whisper native binaries
+        env:
+          GGML_NATIVE: OFF
+        run: pnpm --filter @amical/whisper-wrapper build:native
+
+      - name: Download Node.js binaries
+        working-directory: apps/desktop
+        run: pnpm download-node
+
+      - name: Import Developer ID cert
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.DEVELOPER_CERT_BASE64 }}
+          p12-password: ${{ secrets.DEVELOPER_CERT_PASSPHRASE }}
+
+      - name: List signing identities (debug)
+        run: security find-identity -v -p codesigning
+
+      - name: Verify whisper native binaries
+        run: |
+          echo "=== Checking built whisper variants ==="
+          ls -la packages/whisper-wrapper/native/ || echo "No native directory"
+
+          WHISPER_NODE="packages/whisper-wrapper/native/darwin-x64/whisper.node"
+          if [ ! -f "$WHISPER_NODE" ]; then
+            echo "ERROR: darwin-x64/whisper.node not found"
+            exit 1
+          fi
+          echo "✓ darwin-x64/whisper.node exists"
+          file "$WHISPER_NODE"
+
+      - name: Build artifacts
+        working-directory: apps/desktop
+        env:
+          SKIP_CODESIGNING: false
+          SKIP_NOTARIZATION: false
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CODESIGNING_IDENTITY: ${{ secrets.CODESIGNING_IDENTITY }}
+          POSTHOG_HOST: https://app.posthog.com
+          TELEMETRY_ENABLED: true
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          echo "Building macOS x64 artifacts"
+          pnpm make:x64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x64
+          path: |
+            apps/desktop/out/make/*-x64.dmg
+            apps/desktop/out/make/zip/darwin/x64/*.zip

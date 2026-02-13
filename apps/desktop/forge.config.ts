@@ -440,8 +440,13 @@ const config: ForgeConfig = {
             identity: process.env.CODESIGNING_IDENTITY,
             // Apply different entitlements based on file path
             optionsForFile: (filePath: string) => {
-              // Apply minimal entitlements to Node binary
-              if (filePath.includes("node-binaries")) {
+              // Apply JIT entitlements to the bundled Node.js binary.
+              // extraResource copies node-binaries/<platform>-<arch>/node → Resources/node,
+              // so we must match the packaged path (Resources/node), not the source path.
+              if (
+                filePath.includes("node-binaries") ||
+                filePath.endsWith("/Resources/node")
+              ) {
                 return {
                   entitlements: "./entitlements.node.plist",
                   hardenedRuntime: true,

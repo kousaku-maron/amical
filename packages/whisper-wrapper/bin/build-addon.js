@@ -190,6 +190,11 @@ function variantFromName(name, platform, arch) {
   }
   if (name.startsWith("darwin-")) {
     envOverrides.GGML_USE_ACCELERATE = envOverrides.GGML_USE_ACCELERATE || "1";
+    // Explicitly disable Metal for non-Metal darwin variants.
+    // whisper.cpp CMake auto-enables Metal on macOS, causing GPU timeout on Intel GPUs.
+    if (!name.includes("-metal")) {
+      envOverrides.GGML_METAL = "OFF";
+    }
   }
 
   return { name, env: envOverrides };
@@ -211,7 +216,8 @@ function computeVariants(platform, arch) {
     return result;
   }
 
-  if (platform === "darwin") {
+  if (platform === "darwin" && arch === "arm64") {
+    // Metal is only usable on Apple Silicon; Intel GPUs timeout on Metal compute shaders
     const metal = variantFromName(`${platform}-${arch}-metal`, platform, arch);
     if (metal) result.push(metal);
   }

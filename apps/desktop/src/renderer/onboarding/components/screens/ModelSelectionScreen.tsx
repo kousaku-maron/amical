@@ -40,7 +40,10 @@ export function ModelSelectionScreen({
     );
   }, [availableModelsQuery.data]);
 
-  const recommendedModelId = "whisper-large-v3-turbo";
+  const recommendedModelQuery =
+    api.onboarding.getRecommendedLocalModel.useQuery();
+  const recommendedModelId =
+    recommendedModelQuery.data ?? "whisper-base";
   const preferredOrder = useMemo(
     () => [
       recommendedModelId,
@@ -279,16 +282,9 @@ export function ModelSelectionScreen({
       <div className="mx-auto w-full max-w-[760px] space-y-4">
         {/* Offline Model List */}
         <div className="mx-auto w-full max-w-[540px] space-y-4">
-          {offlineModels
-            .slice()
-            .sort((a, b) => {
-              if (a.id === recommendedModelId) return -1;
-              if (b.id === recommendedModelId) return 1;
-              return 0;
-            })
-            .map((model) =>
-              renderModelCard(model, model.id === recommendedModelId),
-            )}
+          {offlineModels.map((model) =>
+            renderModelCard(model, model.id === recommendedModelId),
+          )}
         </div>
 
         {error && (
