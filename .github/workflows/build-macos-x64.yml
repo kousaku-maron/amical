@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "x/build-macos-x64"
+      - "feat/gpu-acceleration-switch"
 
 jobs:
   build:
