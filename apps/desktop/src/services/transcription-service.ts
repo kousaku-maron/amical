@@ -71,36 +71,43 @@ export class TranscriptionService {
   }
 
   private async getDefaultWhisperProvider(): Promise<WhisperProvider> {
-    if (this.whisperProvider) return this.whisperProvider;
-    const useGPU = await this.resolveUseGPU();
-    this.whisperProvider = new WhisperProvider(
-      this.modelService,
-      undefined,
-      useGPU,
-    );
-    return this.whisperProvider;
+    return this.modelLoadMutex.runExclusive(async () => {
+      if (this.whisperProvider) return this.whisperProvider;
+      const useGPU = await this.resolveUseGPU();
+      this.whisperProvider = new WhisperProvider(
+        this.modelService,
+        undefined,
+        useGPU,
+      );
+      return this.whisperProvider;
+    });
   }
 
-  private async resolveUseGPU(): Promise<boolean | undefined> {
+  private async resolveUseGPU(): Promise<boolean> {
     if (this.resolvedUseGPU !== undefined) return this.resolvedUseGPU;
     const transcriptionSettings =
       await this.settingsService.getTranscriptionSettings();
-    this.resolvedUseGPU = transcriptionSettings?.useGPU;
+    // Apply platform default if not explicitly set in DB
+    this.resolvedUseGPU =
+      transcriptionSettings?.useGPU ??
+      (process.platform === "darwin" && process.arch === "arm64");
     return this.resolvedUseGPU;
   }
 
   private async getOrCreateWhisperProvider(
     modelId: string,
   ): Promise<WhisperProvider> {
-    const cached = this.whisperProvidersByModelId.get(modelId);
-    if (cached) {
-      return cached;
-    }
+    return this.modelLoadMutex.runExclusive(async () => {
+      const cached = this.whisperProvidersByModelId.get(modelId);
+      if (cached) {
+        return cached;
+      }
 
-    const useGPU = await this.resolveUseGPU();
-    const provider = new WhisperProvider(this.modelService, modelId, useGPU);
-    this.whisperProvidersByModelId.set(modelId, provider);
-    return provider;
+      const useGPU = await this.resolveUseGPU();
+      const provider = new WhisperProvider(this.modelService, modelId, useGPU);
+      this.whisperProvidersByModelId.set(modelId, provider);
+      return provider;
+    });
   }
 
   /**

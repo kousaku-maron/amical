@@ -35,9 +35,7 @@ export function AdvancedSettingsContent({
   showHeader = true,
 }: AdvancedSettingsContentProps) {
   // Apple Silicon Mac defaults to GPU ON, everything else defaults to OFF
-  const isAppleSilicon =
-    window.electronAPI.platform === "darwin" &&
-    window.electronAPI.arch === "arm64";
+  const isAppleSilicon = window.electronAPI.isAppleSilicon;
   const [useGPU, setUseGPU] = useState(isAppleSilicon);
   const [preloadWhisperModel, setPreloadWhisperModel] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
@@ -112,11 +110,30 @@ export function AdvancedSettingsContent({
     }
   }, [settingsQuery.data]);
 
+  const relaunchAppMutation = api.settings.relaunchApp.useMutation();
+
   const handleUseGPUChange = (checked: boolean) => {
     setUseGPU(checked);
-    updateTranscriptionSettingsMutation.mutate({
-      useGPU: checked,
-    });
+    updateTranscriptionSettingsMutation.mutate(
+      {
+        useGPU: checked,
+      },
+      {
+        onSuccess: () => {
+          // Prompt user to restart the app
+          const shouldRestart = window.confirm(
+            "GPU settings have been updated. The app needs to restart to apply the changes. Restart now?"
+          );
+          if (shouldRestart) {
+            relaunchAppMutation.mutate();
+          } else {
+            toast.info("Please restart the app manually to apply GPU settings.", {
+              duration: 5000,
+            });
+          }
+        },
+      },
+    );
   };
 
   const handlePreloadWhisperModelChange = (checked: boolean) => {

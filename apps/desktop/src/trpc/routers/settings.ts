@@ -1095,6 +1095,12 @@ export const settingsRouter = createRouter({
     }
   }),
 
+  relaunchApp: procedure.mutation(async () => {
+    // Relaunch the app to apply settings changes
+    app.relaunch();
+    app.quit();
+  }),
+
   getInstalledApps: procedure.query(async ({ ctx }) => {
     const service = ctx.serviceManager.getService("installedAppsService");
     return await service.getInstalledApps();

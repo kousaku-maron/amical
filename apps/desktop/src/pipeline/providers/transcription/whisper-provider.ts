@@ -55,14 +55,11 @@ export class WhisperProvider implements TranscriptionProvider {
   constructor(
     modelService: ModelService,
     preferredModelId?: string,
-    useGPU?: boolean,
+    useGPU: boolean = false,
   ) {
     this.modelService = modelService;
     this.preferredModelId = preferredModelId;
-    // Default: GPU ON for Apple Silicon Mac, OFF otherwise
-    this.useGPU =
-      useGPU ??
-      (process.platform === "darwin" && process.arch === "arm64");
+    this.useGPU = useGPU;
   }
 
   /**
