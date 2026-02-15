@@ -71,15 +71,14 @@ Windows + Vulkan でも同じパターンが起きうる:
 - 全 Windows 環境で安定動作を優先
 - GPU 対応は次フェーズで追加
 
-## 次フェーズ: GPU スイッチの追加
+## 実装済み: GPU Acceleration スイッチ (PR #26)
 
-### 方針
+Settings > Advanced に **「GPU Acceleration」スイッチ** を実装済み。macOS（Metal）と共通の UX。
 
-Settings UI に **「GPU を利用する」スイッチ** を追加する。macOS（Metal）と共通の UX。
-
-- **デフォルト: OFF**（CPU 版で確実に動作）
+- **Windows デフォルト: OFF**（CPU 版で確実に動作）
 - ユーザーが明示的に ON にすると Vulkan 経由で GPU を利用
 - 動作しなければユーザー自身で OFF に戻せる
+- スイッチ変更後は再起動が必要（確認ダイアログあり）
 
 ### 自動検知/フォールバックを採用しない理由
 
@@ -101,12 +100,23 @@ Settings UI に **「GPU を利用する」スイッチ** を追加する。macO
 - dGPU 搭載ユーザーは自覚があるので自分で ON にできる
 - 問題発生時にユーザーが自力で OFF に戻せる
 
-### 実装時の変更箇所
+### 実装の仕組み
 
-1. **Settings UI**: GPU 利用スイッチを追加
-2. **`loader.ts`**: 設定値を参照し、OFF なら GPU 候補（metal, vulkan, cuda）をスキップ
-3. **`intel-macos-whisper-worker.md` の修正2（ハードコードスキップ）を廃止**: スイッチに置き換え
-4. **`release.yml`**: Vulkan ビルドステップを有効化
+```
+[Settings UI] GPU switch ON/OFF
+  → tRPC mutation → DB に transcription.useGPU 保存
+  → (再起動)
+  → WhisperProvider → SimpleForkWrapper に WHISPER_USE_GPU="1"/"0" env を渡す
+  → Worker fork 起動
+    → loader.ts: candidateDirs() で WHISPER_USE_GPU をチェック → "0" なら GPU 候補スキップ
+    → index.ts: binding.init({ use_gpu }) でランタイム GPU 制御
+```
+
+### 残タスク: Windows で GPU を有効化するには
+
+1. **`release.yml`**: Vulkan ビルドステップのコメントアウトを解除
+2. **Vulkan SDK**: CI に Vulkan SDK インストールステップを追加
+3. **動作検証**: dGPU 搭載 Windows 機で GPU ON の動作確認
 
 ## 補足: ARM 版 Surface (Snapdragon X)
 

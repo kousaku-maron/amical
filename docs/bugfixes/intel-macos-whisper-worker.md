@@ -113,23 +113,28 @@ optionsForFile: (filePath: string) => {
 
 > **補足**: 最初 `filePath.endsWith("/node")` としたが、Mach-O 以外のファイル（`electron.asar/browser/api/node` 等）にもマッチしてしまい `codesign` が失敗したため、`"/Resources/node"` に限定。
 
-### 修正2: `packages/whisper-wrapper/src/loader.ts` — Metal を Intel Mac でスキップ
+### 修正2: `packages/whisper-wrapper/src/loader.ts` — GPU スイッチによる制御（ハードコードスキップ廃止）
 
-`candidateDirs()` で `metal` を `darwin-arm64` のみに限定。
-Intel Mac の GPU で Metal compute shaders がタイムアウトする問題を回避し、CPU版 (`darwin-x64`) へフォールバック。
+~~当初は `candidateDirs()` で `metal` を `darwin-arm64` のみにハードコードスキップしていた。~~
+
+PR #26 で **Settings UI の GPU Acceleration スイッチ** に置き換え済み。
+環境変数 `WHISPER_USE_GPU` (`"0"` = GPU スキップ) で `candidateDirs()` が GPU 候補の有無を制御する。
 
 ```typescript
 function candidateDirs(platform: string, arch: string): string[] {
+  const useGPU = process.env.WHISPER_USE_GPU !== "0";
   const candidates = GPU_FIRST_CANDIDATES.filter((tag) => {
-    // Metal is only usable on Apple Silicon; Intel GPUs timeout on Metal compute shaders
-    if (tag === "metal" && (platform !== "darwin" || arch !== "arm64")) {
-      return false;
-    }
+    if (!useGPU && GPU_TAGS.includes(tag)) return false;
     return true;
   });
   // ...
 }
 ```
+
+デフォルト値:
+- **Apple Silicon Mac**: ON (Metal で高速動作の実績あり)
+- **Intel Mac**: OFF (GPU Timeout の実績あり)
+- **Windows**: OFF (未検証)
 
 ### 修正3: `packages/whisper-wrapper/bin/build-addon.js` — ビルド時の Metal 除外
 
@@ -158,24 +163,37 @@ whisper.cpp の CMake は macOS 上で `GGML_METAL` をデフォルトで有効�
 3. **Metal ≠ Apple GPU 全般**: Metal API 自体は Intel GPU でも動作するが、whisper.cpp の compute shaders は Apple Silicon 専用に最適化されている。`dlopen` 成功後の GPU 初期化タイムアウトは `require()` のフォールバック機構では捕捉できない。
 4. **Hardened Runtime の W^X は x86_64 特有の問題**: arm64 では `MAP_JIT` API を使うため影響しない。x86_64 のみ `com.apple.security.cs.allow-jit` が必須。
 
-## 現在の制限事項と今後の方針
+## 実装済み: Settings GPU Acceleration スイッチ (PR #26)
 
-### 現状
+### 概要
 
-修正2 により `loader.ts` で Metal を `darwin-arm64` 以外でハードコードスキップしている。
-これにより Intel Mac は **CPU 版のみ** で動作する。
+ハードコードスキップを廃止し、Settings > Advanced に **「GPU Acceleration」スイッチ** を実装した。
 
-### 課題
+### 変更ファイル
 
-- Metal API 自体は Intel GPU でも `dlopen` 成功するため、GPU のスペック次第では動作する可能性がある（例: Radeon 搭載の MacBook Pro 15/16 インチ）
-- 現状のハードコードスキップでは、そうした機種でも一律 GPU を使えない
+| ファイル | 変更内容 |
+|---------|---------|
+| `apps/desktop/src/db/schema.ts` | `transcription.useGPU?: boolean` 追加 |
+| `apps/desktop/src/trpc/routers/settings.ts` | `useGPU` の zod input 追加、`relaunchApp` mutation 追加 |
+| `apps/desktop/src/renderer/.../AdvancedSettingsContent.tsx` | GPU スイッチ UI、再起動確認ダイアログ |
+| `packages/whisper-wrapper/src/loader.ts` | `WHISPER_USE_GPU` 環境変数で GPU 候補制御 |
+| `packages/whisper-wrapper/src/index.ts` | `binding.init()` に `use_gpu` パラメータ渡し |
+| `apps/desktop/src/pipeline/.../whisper-worker-fork.ts` | `WHISPER_USE_GPU` env 読み取り → Whisper に渡す |
+| `apps/desktop/src/pipeline/.../simple-fork-wrapper.ts` | `additionalEnv` でワーカーに環境変数伝搬 |
+| `apps/desktop/src/pipeline/.../whisper-provider.ts` | `useGPU` フラグを SimpleForkWrapper に渡す |
+| `apps/desktop/src/services/transcription-service.ts` | `resolveUseGPU()` でプラットフォームデフォルト決定、Mutex で排他制御 |
+| `apps/desktop/src/main/preload.ts` | `isAppleSilicon` をレンダラーに公開 |
 
-### 今後の方針: Settings に GPU スイッチを追加
+### 実装中に発見した追加バグ
 
-Intel Mac のハードコードスキップを廃止し、**Settings UI に「GPU を利用する」スイッチ**を追加する。
+GPU スイッチ実装後、スイッチ OFF でも whisper が GPU を使い続ける問題が判明。根本原因は2つ:
 
-- **デフォルト: OFF**（CPU 版で確実に動作）
-- ユーザーが明示的に ON にすると Metal 経由で GPU を利用
-- 動作しなければユーザー自身で OFF に戻せる
+1. **`Whisper` クラスが `opts` パラメータを無視していた**: `_opts` として受け取り `binding.init()` に `use_gpu` を渡していなかった
+2. **`whisper-worker-fork.ts` が `{ gpu: true }` をハードコードしていた**: `WHISPER_USE_GPU` 環境変数を読んでいなかった
 
-この方針は Windows 版（Vulkan）と共通。詳細は `docs/bugfixes/windows-whisper-gpu.md` を参照。
+`darwin-arm64` バイナリ自体にも Metal が組み込まれているため（CMake のデフォルト）、バイナリ選択だけでは GPU 制御できず、**ランタイムの `use_gpu` パラメータが実際の制御手段**となっている。
+
+### 残課題
+
+- **ビルド側の改善**: `darwin-arm64` (非Metal バリアント) に Metal が混入しないよう CMake で `GGML_METAL=OFF` を明示する (Low Priority)
+- **`app.relaunch()` の開発モード制限**: 開発モードでは再起動時にレンダラーが黒画面になる。本番では正常動作。コメントで注記済み
