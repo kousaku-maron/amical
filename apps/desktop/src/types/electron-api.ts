@@ -7,6 +7,8 @@ declare global {
 export interface ElectronAPI {
   // Platform information
   platform: NodeJS.Platform;
+  arch: NodeJS.Architecture;
+  isAppleSilicon: boolean;
 
   // Listeners remain the same (two-way to renderer)
   onGlobalShortcut: (

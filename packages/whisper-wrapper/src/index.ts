@@ -14,9 +14,12 @@ export class Whisper {
 
   constructor(
     private modelPath: string,
-    _opts?: WhisperOptions,
+    opts?: WhisperOptions,
   ) {
-    this.ctx = binding.init({ model: modelPath });
+    this.ctx = binding.init({
+      model: modelPath,
+      use_gpu: opts?.gpu ?? true,
+    });
   }
 
   async load(): Promise<void> {

@@ -29,6 +29,7 @@ export class SimpleForkWrapper {
   constructor(
     private workerPath: string,
     private nodeBinaryPath: string,
+    private additionalEnv: Record<string, string> = {},
   ) {}
 
   async initialize(): Promise<void> {
@@ -45,6 +46,7 @@ export class SimpleForkWrapper {
       ...process.env,
       ELECTRON_RUN_AS_NODE: "1",
       NODE_OPTIONS: "--max-old-space-size=8192",
+      ...this.additionalEnv,
     };
 
     if (app.isPackaged && this.workerPath.includes(".asar")) {

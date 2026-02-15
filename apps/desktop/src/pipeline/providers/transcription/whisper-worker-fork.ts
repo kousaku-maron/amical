@@ -43,7 +43,9 @@ const methods = {
       whisperInstance = null;
     }
 
-    whisperInstance = new Whisper(modelPath, { gpu: true });
+    const useGpu = process.env.WHISPER_USE_GPU !== "0";
+    logger.transcription.info(`Initializing Whisper with GPU=${useGpu}`);
+    whisperInstance = new Whisper(modelPath, { gpu: useGpu });
     try {
       await whisperInstance.load();
     } catch (e) {

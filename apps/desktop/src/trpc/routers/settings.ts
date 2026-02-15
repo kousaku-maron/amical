@@ -143,6 +143,7 @@ export const settingsRouter = createRouter({
         enablePunctuation: z.boolean().optional(),
         enableTimestamps: z.boolean().optional(),
         preloadWhisperModel: z.boolean().optional(),
+        useGPU: z.boolean().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1092,6 +1093,15 @@ export const settingsRouter = createRouter({
       }
       throw new Error("Failed to reset app");
     }
+  }),
+
+  relaunchApp: procedure.mutation(async () => {
+    // Relaunch the app to apply settings changes
+    // NOTE: This only works reliably in production (app.isPackaged).
+    // In development mode, app.relaunch() may cause the renderer to fail to load.
+    // Users should manually restart the dev server instead.
+    app.relaunch();
+    app.quit();
   }),
 
   getInstalledApps: procedure.query(async ({ ctx }) => {

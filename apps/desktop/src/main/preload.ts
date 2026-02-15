@@ -13,6 +13,8 @@ interface ShortcutData {
 const api: ElectronAPI = {
   // Platform information
   platform: process.platform,
+  arch: process.arch,
+  isAppleSilicon: process.platform === "darwin" && process.arch === "arm64",
 
   sendAudioChunk: (
     chunk: Float32Array,

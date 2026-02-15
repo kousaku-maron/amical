@@ -2,11 +2,15 @@ import path from "node:path";
 import fs from "node:fs";
 
 const GPU_FIRST_CANDIDATES = ["metal", "openblas", "cuda", "vulkan"] as const;
+const GPU_TAGS: readonly string[] = ["metal", "cuda", "vulkan"];
 
 function candidateDirs(platform: string, arch: string): string[] {
+  // WHISPER_USE_GPU env controls GPU candidate inclusion.
+  // "0" = skip GPU candidates (CPU only), anything else = try GPU first.
+  const useGPU = process.env.WHISPER_USE_GPU !== "0";
+
   const candidates = GPU_FIRST_CANDIDATES.filter((tag) => {
-    // Metal is only usable on Apple Silicon; Intel GPUs timeout on Metal compute shaders
-    if (tag === "metal" && (platform !== "darwin" || arch !== "arm64")) {
+    if (!useGPU && GPU_TAGS.includes(tag)) {
       return false;
     }
     return true;
