@@ -1097,6 +1097,9 @@ export const settingsRouter = createRouter({
 
   relaunchApp: procedure.mutation(async () => {
     // Relaunch the app to apply settings changes
+    // NOTE: This only works reliably in production (app.isPackaged).
+    // In development mode, app.relaunch() may cause the renderer to fail to load.
+    // Users should manually restart the dev server instead.
     app.relaunch();
     app.quit();
   }),
