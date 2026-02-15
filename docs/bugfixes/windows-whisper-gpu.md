@@ -128,3 +128,22 @@ Surface Pro 11 / Surface Laptop 7 の一部モデルは Snapdragon X Elite/Plus 
 - 現時点では未検証・未対応
 
 **ARM 版 Surface のユーザーがいた場合は要対応。** 優先度はユーザーの有無に応じて判断する。
+
+## 追記 (2026-02-15): Windows 起動時の `onnxruntime_binding.node` エラー
+
+PR #27 のビルド成果物で、初回起動時に以下のエラーが報告された:
+
+- `The specified module could not be found. ... onnxruntime_binding.node`
+- `A dynamic link library (DLL) initialization routine failed. ... onnxruntime_binding.node`
+
+### 原因
+
+`onnxruntime_binding.node` の依存 DLL として `msvcp140.dll` / `vcruntime140.dll` / `vcruntime140_1.dll` を同梱していたが、  
+実際には `onnxruntime.dll` の推移依存で `MSVCP140_1.dll` も必要だった。
+
+そのため、VC++ 再頒布可能パッケージが入っていない Windows 環境では、起動時にネイティブモジュールのロードが失敗した。
+
+### 対応
+
+`apps/desktop/forge.config.ts` の `postPackage` フックで同梱する VC++ ランタイム DLL に
+`msvcp140_1.dll` を追加した。
