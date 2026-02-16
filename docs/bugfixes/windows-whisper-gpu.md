@@ -164,3 +164,25 @@ PR #27 のビルド成果物で、初回起動時に以下のエラーが報告�
 3. 最新 artifact の `Setup.exe` を実行
 
 `nupkg` は更新用パッケージであり、手動実行は不要。
+
+## 追記 (2026-02-16): 起動プロセスは存在するがウィンドウが表示されない問題
+
+DLL 対応後、以下の状態が確認された:
+
+- `app-0.0.6\resources\app.asar.unpacked\node_modules\onnxruntime-node\bin\napi-v6\win32\x64` に
+  `onnxruntime_binding.node` / `onnxruntime.dll` / VC++ ランタイム DLL が存在
+- `Grizzo.exe` 実行後に `Grizzo.exe` プロセスが複数起動している
+- しかしメインウィンドウが表示されない
+
+このため、原因は `onnxruntime` の DLL 不足ではなく、起動シーケンス中に
+`ServiceManager.initialize()` が完了せず、ウィンドウ作成まで進めないケースと判断した。
+
+### 対応方針
+
+`apps/desktop/src/main/managers/service-manager.ts` の
+`TranscriptionService.initialize()` 呼び出しにタイムアウト (15 秒) を導入し、
+初期化がハングしても UI 起動をブロックしないようにする。
+
+- 成功時: 従来どおり transcription を有効化
+- 失敗/タイムアウト時: transcription を `null` として継続起動
+- ログに timeout/error を残して後続調査を可能にする

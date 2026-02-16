@@ -160,11 +160,56 @@ export class ServiceManager {
         this.nativeBridge,
         this.onboardingService,
       );
-      await this.transcriptionService.initialize();
+      const initTimeoutMs = 15000;
+      const initResult = await new Promise<
+        { status: "ok" } | { status: "error"; error: unknown } | { status: "timeout" }
+      >((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          resolve({ status: "timeout" });
+        }, initTimeoutMs);
 
-      logger.transcription.info("Transcription Service initialized", {
-        client: "Pipeline with Whisper",
+        this.transcriptionService!
+          .initialize()
+          .then(() => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve({ status: "ok" });
+          })
+          .catch((error) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve({ status: "error", error });
+          });
       });
+
+      if (initResult.status === "ok") {
+        logger.transcription.info("Transcription Service initialized", {
+          client: "Pipeline with Whisper",
+        });
+        return;
+      }
+
+      if (initResult.status === "timeout") {
+        logger.transcription.error(
+          "Transcription Service initialization timed out",
+          { timeoutMs: initTimeoutMs },
+        );
+      } else {
+        logger.transcription.error(
+          "Error initializing Transcription Service:",
+          initResult.error,
+        );
+      }
+
+      logger.transcription.warn(
+        "Transcription will not work until configuration is fixed",
+      );
+      this.transcriptionService = null;
     } catch (error) {
       logger.transcription.error(
         "Error initializing Transcription Service:",
