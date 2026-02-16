@@ -379,21 +379,54 @@ const config: ForgeConfig = {
         ];
 
         for (const outputPath of outputPaths) {
+          const targetDirs = [
+            outputPath,
+            join(
+              outputPath,
+              "resources",
+              "app.asar.unpacked",
+              "node_modules",
+              "onnxruntime-node",
+              "bin",
+              "napi-v6",
+              "win32",
+              "x64",
+            ),
+            join(
+              outputPath,
+              "resources",
+              "app",
+              "node_modules",
+              "onnxruntime-node",
+              "bin",
+              "napi-v6",
+              "win32",
+              "x64",
+            ),
+          ];
           console.log(
             `[postPackage] Bundling VC++ runtime DLLs for Windows at ${outputPath}...`,
           );
-          for (const dll of vcRuntimeDlls) {
-            const src = `C:\\Windows\\System32\\${dll}`;
-            const dest = join(outputPath, dll);
-            try {
-              copyFileSync(src, dest);
-              console.log(`  ✓ Copied ${dll}`);
-            } catch (error) {
-              console.error(`  ✗ Failed to copy ${dll}:`, error);
-              throw new Error(
-                `Failed to bundle ${dll}. The build machine must have Visual C++ runtime installed. ` +
-                  `On GitHub Actions, use a Windows runner with Visual Studio (e.g., windows-2025).`,
-              );
+          for (const targetDir of targetDirs) {
+            if (!existsSync(targetDir)) {
+              continue;
+            }
+            for (const dll of vcRuntimeDlls) {
+              const src = `C:\\Windows\\System32\\${dll}`;
+              const dest = join(targetDir, dll);
+              try {
+                copyFileSync(src, dest);
+                console.log(`  ✓ Copied ${dll} -> ${targetDir}`);
+              } catch (error) {
+                console.error(
+                  `  ✗ Failed to copy ${dll} to ${targetDir}:`,
+                  error,
+                );
+                throw new Error(
+                  `Failed to bundle ${dll}. The build machine must have Visual C++ runtime installed. ` +
+                    `On GitHub Actions, use a Windows runner with Visual Studio (e.g., windows-2025).`,
+                );
+              }
             }
           }
         }
