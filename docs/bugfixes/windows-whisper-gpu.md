@@ -186,3 +186,32 @@ DLL 対応後、以下の状態が確認された:
 - 成功時: 従来どおり transcription を有効化
 - 失敗/タイムアウト時: transcription を `null` として継続起動
 - ログに timeout/error を残して後続調査を可能にする
+
+## 追記 (2026-02-16): VAD 初期化ハングの根本原因と恒久対応
+
+Windows 10 `10.0.17134` 環境で、以下のログで起動が停止する事象を確認した。
+
+- `Loading VAD model from ...silero_vad_v6.onnx`
+- 以降 `VAD service initialized` が出ず、ウィンドウ作成まで進まない
+
+### 根本原因
+
+`onnxruntime-node` が lockfile 上 `1.22.0` に解決されており、実行環境の Windows ビルド (`17134`) と互換性がなかった。
+
+- `apps/desktop/package.json` は `^1.20.1` 指定
+- しかし lockfile は `1.22.0` を選択
+- ONNX Runtime 1.22 系の Windows 要件 (10.0.19041+) を満たさない環境で
+  `InferenceSession.create()` が正常完了せず初期化ハング
+
+### 恒久対応
+
+1. `apps/desktop/package.json` の `onnxruntime-node` を `1.20.1` に**厳密固定**  
+   (`^1.20.1` → `1.20.1`)
+2. `pnpm-lock.yaml` を更新し、`onnxruntime-node` / `onnxruntime-common` を `1.20.1` に固定
+
+これにより、古い Windows 10 ビルドを含む環境でも VAD 初期化の互換性リスクを下げる。
+
+### 補足
+
+`ServiceManager` 側の VAD 初期化タイムアウト/フォールバックは、将来の環境差異に対する
+起動不能回避のセーフティネットとして維持する。

@@ -134,10 +134,49 @@ export class ServiceManager {
   private async initializeVADService(): Promise<void> {
     try {
       this.vadService = new VADService();
-      await this.vadService.initialize();
-      logger.main.info("VAD service initialized");
+      const initTimeoutMs = 10000;
+      const initResult = await new Promise<
+        { status: "ok" } | { status: "error"; error: unknown } | { status: "timeout" }
+      >((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          resolve({ status: "timeout" });
+        }, initTimeoutMs);
+
+        this.vadService!
+          .initialize()
+          .then(() => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve({ status: "ok" });
+          })
+          .catch((error) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve({ status: "error", error });
+          });
+      });
+
+      if (initResult.status === "ok") {
+        logger.main.info("VAD service initialized");
+        return;
+      }
+
+      if (initResult.status === "timeout") {
+        logger.main.error("VAD service initialization timed out", {
+          timeoutMs: initTimeoutMs,
+        });
+      } else {
+        logger.main.error("Failed to initialize VAD service:", initResult.error);
+      }
+      logger.main.warn("Continuing startup with VAD disabled fallback");
     } catch (error) {
       logger.main.error("Failed to initialize VAD service:", error);
+      logger.main.warn("Continuing startup with VAD disabled fallback");
       // Don't throw - VAD is not critical for basic functionality
     }
   }

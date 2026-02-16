@@ -10,6 +10,7 @@ export class VADService extends EventEmitter {
   private modelPath: string | null = null;
   private state: ort.Tensor | null = null;
   private sr: number = 16000;
+  private hasLoggedUnavailableWarning = false;
 
   // Configuration
   private readonly WINDOW_SIZE_SAMPLES = 512; // 32ms at 16kHz
@@ -57,12 +58,16 @@ export class VADService extends EventEmitter {
       }
 
       // Load ONNX model
+      const executionProviders =
+        process.platform === "darwin" ? ["coreml", "cpu"] : ["cpu"];
+
       this.session = await ort.InferenceSession.create(this.modelPath, {
-        executionProviders: ["coreml", "cpu"],
+        executionProviders,
       });
 
       // Initialize hidden states (h and c)
       this.resetStates();
+      this.hasLoggedUnavailableWarning = false;
 
       logger.main.info("VAD service initialized successfully");
     } catch (error) {
@@ -89,7 +94,13 @@ export class VADService extends EventEmitter {
     audioFrames: Float32Array,
   ): Promise<{ probability: number; isSpeaking: boolean }> {
     if (!this.session || !this.state) {
-      throw new Error("VAD service not initialized");
+      if (!this.hasLoggedUnavailableWarning) {
+        logger.main.warn(
+          "VAD is not ready; continuing without voice activity detection",
+        );
+        this.hasLoggedUnavailableWarning = true;
+      }
+      return { probability: 0, isSpeaking: false };
     }
 
     try {
