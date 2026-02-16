@@ -151,3 +151,16 @@ PR #27 のビルド成果物で、初回起動時に以下のエラーが報告�
 再発防止として、DLL の配置先をアプリ実行ファイル直下だけでなく
 `onnxruntime_binding.node` と同じディレクトリ
 (`resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/win32/x64`) にも追加した。
+
+### 検証時の注意 (Squirrel / 同一バージョン再インストール)
+
+`Setup.exe` を再実行するだけでは、同一バージョン (`0.0.6`) の場合に
+`%LocalAppData%\Grizzo\app-0.0.6` が更新されず、古いファイルが残ることがある。
+
+同じエラーが継続する場合は、以下のクリーン手順で再検証する。
+
+1. Grizzo をアンインストール
+2. `%LocalAppData%\Grizzo` を削除
+3. 最新 artifact の `Setup.exe` を実行
+
+`nupkg` は更新用パッケージであり、手動実行は不要。
