@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - "x/build-windows-x64"
-      - "feat/windows-gpu-vulkan"
 
 jobs:
   build:

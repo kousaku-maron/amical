@@ -24,9 +24,9 @@ jobs:
           - os: macos
             arch: x64
             runner: macos-15-intel
-          # - os: windows
-          #   arch: x64
-          #   runner: windows-2025
+          - os: windows
+            arch: x64
+            runner: windows-2025
 
     steps:
       - name: Checkout code
@@ -215,41 +215,6 @@ jobs:
           prerelease: true
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: Grizzo Desktop v${{ steps.package_version.outputs.version }}
-          # body: |
-          #   ## Grizzo Desktop v${{ steps.package_version.outputs.version }}
-
-          #   ### What's New
-          #   - Please update this section with actual changes
-
-          #   ### Downloads
-
-          #   #### macOS
-          #   - **Apple Silicon (M1/M2/M3)**: Download the DMG or ZIP file for arm64
-          #   - **Intel**: Download the DMG or ZIP file for x64
-
-          #   #### Windows
-          #   - **Windows (x64)**: Download the .exe installer for 64-bit Windows
-
-          #   ### Installation
-
-          #   **macOS**:
-          #   - **DMG**: Download and open the DMG file, then drag Grizzo to your Applications folder
-          #   - **ZIP**: Download and extract the ZIP file, then drag Grizzo to your Applications folder
-
-          #   **Windows**:
-          #   - Download and run the .exe installer
-          #   - Follow the installation wizard
-          #   - The app will be installed to your user AppData folder and a shortcut will be created
-
-          #   The ZIP files are primarily for automatic updates. We recommend using the DMG files for initial installation on macOS.
-          # files: |
-          #   artifacts/macos-arm64/*.dmg
-          #   artifacts/macos-arm64/zip/darwin/arm64/*.zip
-          #   artifacts/macos-x64/*.dmg
-          #   artifacts/macos-x64/zip/darwin/x64/*.zip
-          #   artifacts/windows-x64/*.exe
-          #   artifacts/windows-x64/*.nupkg
-          #   artifacts/windows-x64/RELEASES
           body: |
             ## Grizzo Desktop v${{ steps.package_version.outputs.version }}
 
@@ -263,13 +228,18 @@ jobs:
             - **Intel**: Download the DMG or ZIP file for x64
 
             #### Windows
-            not supported yet...🙏
+            - **Windows (x64)**: Download the .exe installer for 64-bit Windows
 
             ### Installation
 
-            **macOS**: 
+            **macOS**:
             - **DMG**: Download and open the DMG file, then drag Grizzo to your Applications folder
             - **ZIP**: Download and extract the ZIP file, then drag Grizzo to your Applications folder
+
+            **Windows**:
+            - Download and run the .exe installer
+            - Follow the installation wizard
+            - The app will be installed to your user AppData folder and a shortcut will be created
 
             The ZIP files are primarily for automatic updates. We recommend using the DMG files for initial installation on macOS.
           files: |
@@ -277,5 +247,8 @@ jobs:
             artifacts/macos-arm64/zip/darwin/arm64/*.zip
             artifacts/macos-x64/*.dmg
             artifacts/macos-x64/zip/darwin/x64/*.zip
+            artifacts/windows-x64/*.exe
+            artifacts/windows-x64/*.nupkg
+            artifacts/windows-x64/RELEASES
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
