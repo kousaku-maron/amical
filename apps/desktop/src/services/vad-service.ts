@@ -1,14 +1,18 @@
-import * as ort from "onnxruntime-node";
 import { logger } from "../main/logger";
 import { app } from "electron";
 import * as path from "path";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 
+type OrtModule = typeof import("onnxruntime-node");
+type OrtInferenceSession = import("onnxruntime-node").InferenceSession;
+type OrtTensor = import("onnxruntime-node").Tensor;
+
 export class VADService extends EventEmitter {
-  private session: ort.InferenceSession | null = null;
+  private ort: OrtModule | null = null;
+  private session: OrtInferenceSession | null = null;
   private modelPath: string | null = null;
-  private state: ort.Tensor | null = null;
+  private state: OrtTensor | null = null;
   private sr: number = 16000;
   private hasLoggedUnavailableWarning = false;
 
@@ -27,6 +31,54 @@ export class VADService extends EventEmitter {
 
   constructor() {
     super();
+  }
+
+  private isLikelyTransientOrtLoadError(error: unknown): boolean {
+    const text =
+      error instanceof Error
+        ? `${error.message}\n${error.stack ?? ""}`
+        : String(error);
+
+    return /specified module could not be found|dynamic link library \(dll\) initialization routine failed|dll initialization routine failed/i.test(
+      text,
+    );
+  }
+
+  private async loadOrtModuleWithRetry(): Promise<OrtModule> {
+    const maxAttempts = app.isPackaged ? 5 : 1;
+    const retryDelayMs = 1500;
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const ort = await import("onnxruntime-node");
+        if (attempt > 1) {
+          logger.main.info("onnxruntime-node loaded after retry", { attempt });
+        }
+        return ort;
+      } catch (error) {
+        lastError = error;
+        const willRetry =
+          attempt < maxAttempts && this.isLikelyTransientOrtLoadError(error);
+
+        logger.main.warn("Failed to load onnxruntime-node", {
+          attempt,
+          maxAttempts,
+          willRetry,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        if (!willRetry) {
+          throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError ?? "Failed to load onnxruntime-node"));
   }
 
   async initialize(): Promise<void> {
@@ -57,11 +109,13 @@ export class VADService extends EventEmitter {
         );
       }
 
+      this.ort = await this.loadOrtModuleWithRetry();
+
       // Load ONNX model
       const executionProviders =
         process.platform === "darwin" ? ["coreml", "cpu"] : ["cpu"];
 
-      this.session = await ort.InferenceSession.create(this.modelPath, {
+      this.session = await this.ort.InferenceSession.create(this.modelPath, {
         executionProviders,
       });
 
@@ -81,9 +135,14 @@ export class VADService extends EventEmitter {
   }
 
   private resetStates(): void {
+    if (!this.ort) {
+      this.state = null;
+      return;
+    }
+
     // Silero VAD uses a state tensor with shape [2, 1, 128]
     const stateSize = 2 * 1 * 128;
-    this.state = new ort.Tensor(
+    this.state = new this.ort.Tensor(
       "float32",
       new Float32Array(stateSize).fill(0),
       [2, 1, 128],
@@ -93,7 +152,7 @@ export class VADService extends EventEmitter {
   async processBatch(
     audioFrames: Float32Array,
   ): Promise<{ probability: number; isSpeaking: boolean }> {
-    if (!this.session || !this.state) {
+    if (!this.session || !this.state || !this.ort) {
       if (!this.hasLoggedUnavailableWarning) {
         logger.main.warn(
           "VAD is not ready; continuing without voice activity detection",
@@ -104,6 +163,8 @@ export class VADService extends EventEmitter {
     }
 
     try {
+      const ort = this.ort;
+
       // v6: Create combined input [context | frame] with fixed size 576
       const input = new Float32Array(this.INPUT_SIZE);
       input.set(this.context, 0);
@@ -132,7 +193,7 @@ export class VADService extends EventEmitter {
       const stateName = this.session.outputNames.find((n) => n !== outName)!;
 
       // Update state for next iteration
-      this.state = results[stateName] as ort.Tensor;
+      this.state = results[stateName] as OrtTensor;
 
       // Get speech probability
       const probability = (results[outName].data as Float32Array)[0];
