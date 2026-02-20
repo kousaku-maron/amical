@@ -1,0 +1,97 @@
+name: Build Windows x64
+
+on:
+  push:
+    branches:
+      - "x/build-windows-x64"
+
+jobs:
+  build:
+    name: Build Windows (x64)
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.1.0"
+          cache: "pnpm"
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Log Node.js architecture and platform
+        run: |
+          echo "=== Node.js Process Information ==="
+          node -e "console.log('process.arch:', process.arch)"
+          node -e "console.log('process.platform:', process.platform)"
+          echo ""
+
+      - name: Install dependencies
+        env:
+          GGML_NATIVE: OFF
+        run: pnpm install --frozen-lockfile
+
+      - name: Build whisper wrapper JS
+        run: pnpm --filter @amical/whisper-wrapper build
+
+      - name: Build whisper native binaries
+        env:
+          GGML_NATIVE: OFF
+        run: pnpm --filter @amical/whisper-wrapper build:native
+
+      - name: Build whisper native binaries (vulkan)
+        env:
+          GGML_NATIVE: OFF
+        run: pnpm --filter @amical/whisper-wrapper build:native:vulkan
+
+      - name: Verify whisper native binaries
+        shell: bash
+        run: |
+          echo "=== Checking built whisper variants ==="
+          ls -la packages/whisper-wrapper/native/ || echo "No native directory"
+
+          for variant in win32-x64 win32-x64-vulkan; do
+            WHISPER_NODE="packages/whisper-wrapper/native/$variant/whisper.node"
+            if [ -f "$WHISPER_NODE" ]; then
+              echo "✓ $variant/whisper.node exists ($(stat -c%s "$WHISPER_NODE" 2>/dev/null || stat -f%z "$WHISPER_NODE") bytes)"
+            else
+              echo "✗ $variant/whisper.node NOT found"
+            fi
+          done
+
+      - name: Download Node.js binaries
+        working-directory: apps/desktop
+        run: pnpm download-node
+
+      - name: Build artifacts
+        working-directory: apps/desktop
+        env:
+          POSTHOG_HOST: https://app.posthog.com
+          TELEMETRY_ENABLED: true
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          echo "Building Windows x64 artifacts"
+          pnpm make:windows
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: |
+            apps/desktop/out/make/squirrel.windows/x64/*.exe
+            apps/desktop/out/make/squirrel.windows/x64/*.nupkg
+            apps/desktop/out/make/squirrel.windows/x64/RELEASES

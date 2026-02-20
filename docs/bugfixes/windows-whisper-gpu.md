@@ -128,3 +128,114 @@ Surface Pro 11 / Surface Laptop 7 の一部モデルは Snapdragon X Elite/Plus 
 - 現時点では未検証・未対応
 
 **ARM 版 Surface のユーザーがいた場合は要対応。** 優先度はユーザーの有無に応じて判断する。
+
+## 追記 (2026-02-15): Windows 起動時の `onnxruntime_binding.node` エラー
+
+PR #27 のビルド成果物で、初回起動時に以下のエラーが報告された:
+
+- `The specified module could not be found. ... onnxruntime_binding.node`
+- `A dynamic link library (DLL) initialization routine failed. ... onnxruntime_binding.node`
+
+### 原因
+
+`onnxruntime_binding.node` の依存 DLL として `msvcp140.dll` / `vcruntime140.dll` / `vcruntime140_1.dll` を同梱していたが、  
+実際には `onnxruntime.dll` の推移依存で `MSVCP140_1.dll` も必要だった。
+
+そのため、VC++ 再頒布可能パッケージが入っていない Windows 環境では、起動時にネイティブモジュールのロードが失敗した。
+
+### 対応
+
+`apps/desktop/forge.config.ts` の `postPackage` フックで同梱する VC++ ランタイム DLL に
+`msvcp140_1.dll` を追加した。
+
+再発防止として、DLL の配置先をアプリ実行ファイル直下だけでなく
+`onnxruntime_binding.node` と同じディレクトリ
+(`resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/win32/x64`) にも追加した。
+
+### 検証時の注意 (Squirrel / 同一バージョン再インストール)
+
+`Setup.exe` を再実行するだけでは、同一バージョン (`0.0.6`) の場合に
+`%LocalAppData%\Grizzo\app-0.0.6` が更新されず、古いファイルが残ることがある。
+
+同じエラーが継続する場合は、以下のクリーン手順で再検証する。
+
+1. Grizzo をアンインストール
+2. `%LocalAppData%\Grizzo` を削除
+3. 最新 artifact の `Setup.exe` を実行
+
+`nupkg` は更新用パッケージであり、手動実行は不要。
+
+## 追記 (2026-02-16): 起動プロセスは存在するがウィンドウが表示されない問題
+
+DLL 対応後、以下の状態が確認された:
+
+- `app-0.0.6\resources\app.asar.unpacked\node_modules\onnxruntime-node\bin\napi-v6\win32\x64` に
+  `onnxruntime_binding.node` / `onnxruntime.dll` / VC++ ランタイム DLL が存在
+- `Grizzo.exe` 実行後に `Grizzo.exe` プロセスが複数起動している
+- しかしメインウィンドウが表示されない
+
+このため、原因は `onnxruntime` の DLL 不足ではなく、起動シーケンス中に
+`ServiceManager.initialize()` が完了せず、ウィンドウ作成まで進めないケースと判断した。
+
+### 対応方針
+
+`apps/desktop/src/main/managers/service-manager.ts` の
+`TranscriptionService.initialize()` 呼び出しにタイムアウト (15 秒) を導入し、
+初期化がハングしても UI 起動をブロックしないようにする。
+
+- 成功時: 従来どおり transcription を有効化
+- 失敗/タイムアウト時: transcription を `null` として継続起動
+- ログに timeout/error を残して後続調査を可能にする
+
+## 追記 (2026-02-16): VAD 初期化ハングの根本原因と恒久対応
+
+Windows 10 `10.0.17134` 環境で、以下のログで起動が停止する事象を確認した。
+
+- `Loading VAD model from ...silero_vad_v6.onnx`
+- 以降 `VAD service initialized` が出ず、ウィンドウ作成まで進まない
+
+### 根本原因
+
+`onnxruntime-node` が lockfile 上 `1.22.0` に解決されており、実行環境の Windows ビルド (`17134`) と互換性がなかった。
+
+- `apps/desktop/package.json` は `^1.20.1` 指定
+- しかし lockfile は `1.22.0` を選択
+- ONNX Runtime 1.22 系の Windows 要件 (10.0.19041+) を満たさない環境で
+  `InferenceSession.create()` が正常完了せず初期化ハング
+
+### 恒久対応
+
+1. `apps/desktop/package.json` の `onnxruntime-node` を `1.20.1` に**厳密固定**  
+   (`^1.20.1` → `1.20.1`)
+2. `pnpm-lock.yaml` を更新し、`onnxruntime-node` / `onnxruntime-common` を `1.20.1` に固定
+
+これにより、古い Windows 10 ビルドを含む環境でも VAD 初期化の互換性リスクを下げる。
+
+### 補足
+
+`ServiceManager` 側の VAD 初期化タイムアウト/フォールバックは、将来の環境差異に対する
+起動不能回避のセーフティネットとして維持する。
+
+## 追記 (2026-02-16): インストール直後の初回起動で onnxruntime 読み込みエラーが出る問題
+
+症状:
+
+- `Setup.exe` 実行直後に自動起動されたタイミングで
+  `onnxruntime_binding.node` のロード失敗ダイアログが出る
+- その後、手動起動では正常に動作する
+
+### 原因仮説
+
+Squirrel の初回起動 (`--squirrel-firstrun`) 直後は、展開直後の一時状態や
+ウイルススキャンなどの影響でネイティブモジュール読み込みが一時的に失敗する場合がある。
+
+従来実装では `vad-service.ts` が `onnxruntime-node` をトップレベルで即時 `import` していたため、
+一時失敗がそのままメインプロセスの起動失敗に繋がっていた。
+
+### 対応
+
+1. `vad-service.ts` で `onnxruntime-node` を遅延ロードに変更
+2. DLL 初期化系のエラー文言を検知した場合のみ、短時間リトライを実施
+3. `main.ts` で `--squirrel-firstrun` の場合は初期化前に待機を入れる
+
+これにより、インストール直後の一時的な読み込み失敗でダイアログが出る頻度を下げる。

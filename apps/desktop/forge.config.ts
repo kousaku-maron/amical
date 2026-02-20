@@ -359,10 +359,13 @@ const config: ForgeConfig = {
       // - Build machine must have VC++ runtime (GitHub Actions windows-2025 has VS2022)
       // - Target: Windows 10+ (ucrtbase.dll is built into the OS)
       //
-      // DLLs needed by onnxruntime_binding.node:
-      // - msvcp140.dll      : VC++ Standard Library (C++ runtime)
-      // - vcruntime140.dll  : VC++ Runtime (core C runtime)
-      // - vcruntime140_1.dll: VC++ Runtime extension (C++17+ features)
+      // DLLs needed by onnxruntime-node:
+      // - onnxruntime_binding.node directly depends on:
+      //   - msvcp140.dll
+      //   - vcruntime140.dll
+      //   - vcruntime140_1.dll
+      // - onnxruntime.dll (transitive dependency) also requires:
+      //   - msvcp140_1.dll
       //
       // NOTE: This runs in postPackage (not packageAfterPrune) because prune: false
       // is set in packagerConfig, which disables the packageAfterPrune hook.
@@ -370,26 +373,60 @@ const config: ForgeConfig = {
       if (platform === "win32") {
         const vcRuntimeDlls = [
           "msvcp140.dll",
+          "msvcp140_1.dll",
           "vcruntime140.dll",
           "vcruntime140_1.dll",
         ];
 
         for (const outputPath of outputPaths) {
+          const targetDirs = [
+            outputPath,
+            join(
+              outputPath,
+              "resources",
+              "app.asar.unpacked",
+              "node_modules",
+              "onnxruntime-node",
+              "bin",
+              "napi-v6",
+              "win32",
+              "x64",
+            ),
+            join(
+              outputPath,
+              "resources",
+              "app",
+              "node_modules",
+              "onnxruntime-node",
+              "bin",
+              "napi-v6",
+              "win32",
+              "x64",
+            ),
+          ];
           console.log(
             `[postPackage] Bundling VC++ runtime DLLs for Windows at ${outputPath}...`,
           );
-          for (const dll of vcRuntimeDlls) {
-            const src = `C:\\Windows\\System32\\${dll}`;
-            const dest = join(outputPath, dll);
-            try {
-              copyFileSync(src, dest);
-              console.log(`  ✓ Copied ${dll}`);
-            } catch (error) {
-              console.error(`  ✗ Failed to copy ${dll}:`, error);
-              throw new Error(
-                `Failed to bundle ${dll}. The build machine must have Visual C++ runtime installed. ` +
-                  `On GitHub Actions, use a Windows runner with Visual Studio (e.g., windows-2025).`,
-              );
+          for (const targetDir of targetDirs) {
+            if (!existsSync(targetDir)) {
+              continue;
+            }
+            for (const dll of vcRuntimeDlls) {
+              const src = `C:\\Windows\\System32\\${dll}`;
+              const dest = join(targetDir, dll);
+              try {
+                copyFileSync(src, dest);
+                console.log(`  ✓ Copied ${dll} -> ${targetDir}`);
+              } catch (error) {
+                console.error(
+                  `  ✗ Failed to copy ${dll} to ${targetDir}:`,
+                  error,
+                );
+                throw new Error(
+                  `Failed to bundle ${dll}. The build machine must have Visual C++ runtime installed. ` +
+                    `On GitHub Actions, use a Windows runner with Visual Studio (e.g., windows-2025).`,
+                );
+              }
             }
           }
         }

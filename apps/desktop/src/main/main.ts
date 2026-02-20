@@ -86,6 +86,15 @@ app.on("second-instance", (_event, commandLine) => {
 });
 
 app.whenReady().then(async () => {
+  const isSquirrelFirstRun = process.argv.includes("--squirrel-firstrun");
+  if (isSquirrelFirstRun) {
+    const firstRunDelayMs = 8000;
+    logger.main.info("Detected Squirrel first run, delaying app startup", {
+      firstRunDelayMs,
+    });
+    await new Promise((resolve) => setTimeout(resolve, firstRunDelayMs));
+  }
+
   await appManager.initialize();
   isInitialized = true;
 
@@ -99,8 +108,6 @@ app.whenReady().then(async () => {
       if (!isWindows()) {
         updateElectronApp({ notifyUser: true });
       } else {
-        const isSquirrelFirstRun =
-          process.argv.includes("--squirrel-firstrun");
         if (!isSquirrelFirstRun) {
           setTimeout(
             () => updateElectronApp({ notifyUser: true }),
