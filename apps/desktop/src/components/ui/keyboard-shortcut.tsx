@@ -124,4 +124,4 @@ function KeyboardShortcut({
   );
 }
 
-export { KeyboardShortcut };
+export { KeyboardShortcut, formatShortcutKey, isMacPlatform };

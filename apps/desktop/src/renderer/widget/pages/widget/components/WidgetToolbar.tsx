@@ -8,6 +8,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import {
+  formatShortcutKey,
+  isMacPlatform,
+} from "@/components/ui/keyboard-shortcut";
 
 interface WidgetToolbarProps {
   onStartRecording: (e: React.MouseEvent) => void;
@@ -57,10 +61,11 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
   }, []);
 
   const shortcutsQuery = api.settings.getShortcuts.useQuery();
-  const pttShortcut = shortcutsQuery.data?.pushToTalk;
-  const pttDisplay = pttShortcut?.join("+") ?? "";
-  const cycleModeShortcut = shortcutsQuery.data?.cycleMode;
-  const cycleModeDisplay = cycleModeShortcut?.join("+") ?? "";
+  const useMac = isMacPlatform();
+  const formatKeys = (keys?: string[]) =>
+    keys?.map((k) => formatShortcutKey(k, useMac)).join("+") ?? "";
+  const pttDisplay = formatKeys(shortcutsQuery.data?.pushToTalk);
+  const cycleModeDisplay = formatKeys(shortcutsQuery.data?.cycleMode);
 
   const modesQuery = api.settings.getModes.useQuery();
   const modes = modesQuery.data?.items ?? [];
@@ -134,7 +139,7 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
         onClick={() => setMenuOpen(!menuOpen)}
         onMouseEnter={() => setHoveredButton("modes")}
         onMouseLeave={() => setHoveredButton(null)}
-        className="flex items-center justify-center w-[28px] h-[28px] rounded transition-opacity opacity-70 hover:opacity-100"
+        className="flex items-center justify-center w-[28px] h-[28px] rounded-full transition-colors hover:bg-white/15"
         aria-label="Change mode"
       >
         <IconSparkles className="w-[16px] h-[16px] text-white" />
@@ -145,7 +150,7 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
         onClick={onStartRecording}
         onMouseEnter={() => setHoveredButton("grizzo")}
         onMouseLeave={() => setHoveredButton(null)}
-        className="flex items-center justify-center w-[28px] h-[28px] rounded transition-opacity opacity-70 hover:opacity-100"
+        className="flex items-center justify-center w-[28px] h-[28px] rounded-full transition-colors hover:bg-white/15"
         aria-label="Start recording"
       >
         <AudioLines className="w-[16px] h-[16px] text-white" />

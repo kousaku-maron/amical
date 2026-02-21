@@ -13,10 +13,10 @@ const StopButton: React.FC<{ onClick: (e: React.MouseEvent) => void }> = ({
 }) => (
   <button
     onClick={onClick}
-    className="flex items-center justify-center w-[28px] h-[28px] rounded transition-colors"
+    className="flex items-center justify-center w-[28px] h-[28px] rounded-full bg-red-500/20"
     aria-label="Stop recording"
   >
-    <Square className="w-[16px] h-[16px] text-red-500 fill-red-500" />
+    <Square className="w-[12px] h-[12px] text-red-500 fill-red-500" />
   </button>
 );
 
