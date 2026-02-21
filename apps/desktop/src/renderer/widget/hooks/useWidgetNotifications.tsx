@@ -10,7 +10,6 @@ import { WidgetToast } from "../components/WidgetToast";
 
 export const useWidgetNotifications = () => {
   const navigateMainWindow = api.widget.navigateMainWindow.useMutation();
-  const setIgnoreMouseEvents = api.widget.setIgnoreMouseEvents.useMutation();
   const { data: settings } = api.settings.getSettings.useQuery();
   const { defaultDeviceName } = useAudioDevices();
 
@@ -19,19 +18,12 @@ export const useWidgetNotifications = () => {
     return settings?.recording?.preferredMicrophoneName || defaultDeviceName;
   };
 
-  const reEnablePassThrough = () => {
-    setTimeout(() => {
-      setIgnoreMouseEvents.mutate({ ignore: true });
-    }, 100);
-  };
-
   const handleActionClick = async (action: WidgetNotificationAction) => {
     if (action.navigateTo) {
       navigateMainWindow.mutate({ route: action.navigateTo });
     } else if (action.externalUrl) {
       await window.electronAPI.openExternal(action.externalUrl);
     }
-    reEnablePassThrough();
   };
 
   api.recording.widgetNotifications.useSubscription(undefined, {
@@ -58,8 +50,6 @@ export const useWidgetNotifications = () => {
         {
           unstyled: true,
           duration: WIDGET_NOTIFICATION_TIMEOUT,
-          onDismiss: reEnablePassThrough,
-          onAutoClose: reEnablePassThrough,
         },
       );
     },
