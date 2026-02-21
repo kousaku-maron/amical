@@ -17,7 +17,11 @@ export const widgetRouter = createRouter({
       }
 
       const widgetWindow = windowManager.getWidgetWindow();
-      widgetWindow!.setIgnoreMouseEvents(input.ignore, {
+      if (!widgetWindow) {
+        logger.main.error("Widget window not available");
+        return false;
+      }
+      widgetWindow.setIgnoreMouseEvents(input.ignore, {
         forward: true,
       });
       logger.main.debug("Set widget ignore mouse events", input);

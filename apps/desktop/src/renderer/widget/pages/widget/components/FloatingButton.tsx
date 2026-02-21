@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Square } from "lucide-react";
 import { IconSparkles } from "@tabler/icons-react";
 import { Waveform } from "@/components/Waveform";
 import { useRecording } from "@/hooks/useRecording";
-import { api } from "@/trpc/react";
+import { useMouseEvents } from "../../../contexts/MouseEventsContext";
 import { WidgetToolbar } from "./WidgetToolbar";
 
 const NUM_WAVEFORM_BARS = 6;
@@ -51,8 +51,9 @@ export const FloatingButton: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [modeNotification, setModeNotification] = useState<string | null>(null);
   const clickTimeRef = useRef<number | null>(null);
+  const hasAcquiredRef = useRef(false);
 
-  const setIgnoreMouseEvents = api.widget.setIgnoreMouseEvents.useMutation();
+  const { acquire, release } = useMouseEvents();
 
   const { recordingStatus, stopRecording, voiceDetected, startRecording } =
     useRecording();
@@ -68,25 +69,44 @@ export const FloatingButton: React.FC = () => {
     }
   }, [recordingStatus.state]);
 
-  // Centralized setIgnoreMouseEvents management:
-  // Window receives mouse events when hovered OR menu is open.
-  // Re-enable click-through immediately when neither is true.
+  // Acquire/release mouse events based on hover and menu state.
+  // Uses refCount via MouseEventsContext so it doesn't conflict
+  // with other consumers (e.g. toast hover in useWidgetNotifications).
+  const shouldReceiveEvents = isHovered || isMenuOpen;
   useEffect(() => {
-    setIgnoreMouseEvents.mutate({ ignore: !(isHovered || isMenuOpen) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHovered, isMenuOpen]);
+    if (shouldReceiveEvents && !hasAcquiredRef.current) {
+      acquire();
+      hasAcquiredRef.current = true;
+    } else if (!shouldReceiveEvents && hasAcquiredRef.current) {
+      release();
+      hasAcquiredRef.current = false;
+    }
+  }, [shouldReceiveEvents, acquire, release]);
+
+  // Release on unmount to prevent leaked refCount
+  useEffect(() => {
+    return () => {
+      if (hasAcquiredRef.current) {
+        release();
+        hasAcquiredRef.current = false;
+      }
+    };
+  }, [release]);
 
   const handleMouseEnter = () => setIsHovered(true);
   const handleMouseLeave = () => setIsHovered(false);
 
+  // Force isHovered=false when menu closes because mouseleave won't fire
+  // if cursor stays within the pill's DOM area after selecting a menu item.
+  // The pill collapses briefly; the next mouse movement triggers mouseenter.
   const handleMenuOpenChange = (open: boolean) => {
     setIsMenuOpen(open);
     if (!open) setIsHovered(false);
   };
 
-  const handleModeChanged = (modeName: string) => {
+  const handleModeChanged = useCallback((modeName: string) => {
     setModeNotification(modeName);
-  };
+  }, []);
 
   // Auto-dismiss mode notification
   useEffect(() => {

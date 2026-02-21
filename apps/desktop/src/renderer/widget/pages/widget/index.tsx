@@ -1,9 +1,18 @@
 import { useEffect } from "react";
 import { FloatingButton } from "./components/FloatingButton";
 import { useWidgetNotifications } from "../../hooks/useWidgetNotifications";
+import { MouseEventsProvider } from "../../contexts/MouseEventsContext";
 import { api } from "@/trpc/react";
 
 export function WidgetPage() {
+  return (
+    <MouseEventsProvider>
+      <WidgetPageContent />
+    </MouseEventsProvider>
+  );
+}
+
+function WidgetPageContent() {
   useWidgetNotifications();
 
   const utils = api.useUtils();
@@ -12,7 +21,6 @@ export function WidgetPage() {
   useEffect(() => {
     const handleSettingsChanged = () => {
       void utils.settings.getModes.invalidate();
-      void utils.settings.getActiveMode.invalidate();
     };
 
     window.electronAPI.on("settings-changed", handleSettingsChanged);

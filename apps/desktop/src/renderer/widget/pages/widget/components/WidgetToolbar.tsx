@@ -49,10 +49,11 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
     [onMenuOpenChange],
   );
 
-  // Notify parent when unmounted (Radix doesn't call onOpenChange(false) on unmount)
+  // Notify parent when unmounted (Radix doesn't call onOpenChange(false) on unmount).
+  // Intentionally empty deps: we only need cleanup on unmount, not on prop changes.
   useEffect(() => {
     return () => onMenuOpenChange?.(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only cleanup
   }, []);
 
   const shortcutsQuery = api.settings.getShortcuts.useQuery();
@@ -71,10 +72,10 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
   });
 
   const handleSelectMode = useCallback(
-    (modeId: string) => {
+    async (modeId: string) => {
       if (modeId === activeModeId) return;
       const modeName = modes.find((m) => m.id === modeId)?.name ?? "Mode";
-      setActiveMode.mutate({ modeId });
+      await setActiveMode.mutateAsync({ modeId });
       onModeChanged?.(modeName);
     },
     [activeModeId, modes, setActiveMode, onModeChanged],
