@@ -11,8 +11,9 @@ export function KeyboardShortcutsCard() {
   const [toggleRecordingShortcut, setToggleRecordingShortcut] = useState<
     string[]
   >([]);
+  const [cycleModeShortcut, setCycleModeShortcut] = useState<string[]>([]);
   const [recordingShortcut, setRecordingShortcut] = useState<
-    "pushToTalk" | "toggleRecording" | null
+    "pushToTalk" | "toggleRecording" | "cycleMode" | null
   >(null);
 
   const shortcutsQuery = api.settings.getShortcuts.useQuery();
@@ -25,11 +26,12 @@ export function KeyboardShortcutsCard() {
       if (data.warning) {
         toast.warning(data.warning);
       } else {
-        toast.success(
-          variables.type === "pushToTalk"
-            ? "Push to talk shortcut updated"
-            : "Toggle Recording shortcut updated",
-        );
+        const labels: Record<string, string> = {
+          pushToTalk: "Push to talk shortcut updated",
+          toggleRecording: "Toggle Recording shortcut updated",
+          cycleMode: "Change mode shortcut updated",
+        };
+        toast.success(labels[variables.type]);
       }
     },
     onError: (error) => {
@@ -42,6 +44,7 @@ export function KeyboardShortcutsCard() {
     if (shortcutsQuery.data) {
       setPushToTalkShortcut(shortcutsQuery.data.pushToTalk);
       setToggleRecordingShortcut(shortcutsQuery.data.toggleRecording);
+      setCycleModeShortcut(shortcutsQuery.data.cycleMode);
     }
   }, [shortcutsQuery.data]);
 
@@ -57,6 +60,14 @@ export function KeyboardShortcutsCard() {
     setToggleRecordingShortcut(shortcut);
     setShortcutMutation.mutate({
       type: "toggleRecording",
+      shortcut: shortcut,
+    });
+  };
+
+  const handleCycleModeChange = (shortcut: string[]) => {
+    setCycleModeShortcut(shortcut);
+    setShortcutMutation.mutate({
+      type: "cycleMode",
       shortcut: shortcut,
     });
   };
@@ -106,6 +117,30 @@ export function KeyboardShortcutsCard() {
                 isRecordingShortcut={recordingShortcut === "toggleRecording"}
                 onRecordingShortcutChange={(recording) =>
                   setRecordingShortcut(recording ? "toggleRecording" : null)
+                }
+              />
+            </div>
+          </div>
+          <Separator className="my-4" />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-base font-semibold text-foreground">
+                Change mode
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Switch to the next mode
+              </p>
+            </div>
+            <div className="min-w-[200px] flex justify-end">
+              <ShortcutInput
+                value={cycleModeShortcut}
+                onChange={handleCycleModeChange}
+                isRecordingShortcut={recordingShortcut === "cycleMode"}
+                onRecordingShortcutChange={(recording) =>
+                  setRecordingShortcut(recording ? "cycleMode" : null)
                 }
               />
             </div>

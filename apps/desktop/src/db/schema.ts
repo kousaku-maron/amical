@@ -157,6 +157,7 @@ export interface AppSettingsData {
   shortcuts?: {
     pushToTalk?: string[];
     toggleRecording?: string[];
+    cycleMode?: string[];
   };
 
   modelProvidersConfig?: {

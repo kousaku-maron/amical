@@ -1,35 +1,33 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Square } from "lucide-react";
+import { IconSparkles } from "@tabler/icons-react";
 import { Waveform } from "@/components/Waveform";
 import { useRecording } from "@/hooks/useRecording";
-import { api } from "@/trpc/react";
+import { useMouseEvents } from "../../../contexts/MouseEventsContext";
+import { WidgetToolbar } from "./WidgetToolbar";
 
-const NUM_WAVEFORM_BARS = 6; // Fewer bars to make room for stop button
-const DEBOUNCE_DELAY = 100; // milliseconds
+const NUM_WAVEFORM_BARS = 6;
 
-// Separate component for the stop button
 const StopButton: React.FC<{ onClick: (e: React.MouseEvent) => void }> = ({
   onClick,
 }) => (
   <button
     onClick={onClick}
-    className="flex items-center justify-center w-[20px] h-[20px]rounded transition-colors"
+    className="flex items-center justify-center w-[28px] h-[28px] rounded-full bg-red-500/20"
     aria-label="Stop recording"
   >
     <Square className="w-[12px] h-[12px] text-red-500 fill-red-500" />
   </button>
 );
 
-// Separate component for the processing indicator
 const ProcessingIndicator: React.FC = () => (
-  <div className="flex gap-[4px] items-center justify-center flex-1 h-6">
-    <div className="w-[4px] h-[4px] bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-    <div className="w-[4px] h-[4px] bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-    <div className="w-[4px] h-[4px] bg-blue-500 rounded-full animate-bounce" />
+  <div className="flex gap-[5px] items-center justify-center flex-1 h-9">
+    <div className="w-[5px] h-[5px] bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+    <div className="w-[5px] h-[5px] bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+    <div className="w-[5px] h-[5px] bg-blue-500 rounded-full animate-bounce" />
   </div>
 );
 
-// Separate component for the waveform visualization
 const WaveformVisualization: React.FC<{
   isRecording: boolean;
   voiceDetected: boolean;
@@ -50,19 +48,12 @@ const WaveformVisualization: React.FC<{
 
 export const FloatingButton: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
-  const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce timeout
-  const clickTimeRef = useRef<number | null>(null); // Track when user clicked
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [modeNotification, setModeNotification] = useState<string | null>(null);
+  const clickTimeRef = useRef<number | null>(null);
+  const hasAcquiredRef = useRef(false);
 
-  // tRPC mutation to control widget mouse events
-  const setIgnoreMouseEvents = api.widget.setIgnoreMouseEvents.useMutation();
-
-  // Log component initialization
-  useEffect(() => {
-    console.log("FloatingButton component initialized");
-    return () => {
-      console.debug("FloatingButton component unmounting");
-    };
-  }, []);
+  const { acquire, release } = useMouseEvents();
 
   const { recordingStatus, stopRecording, voiceDetected, startRecording } =
     useRecording();
@@ -72,90 +63,86 @@ export const FloatingButton: React.FC = () => {
   const isStopping = recordingStatus.state === "stopping";
   const isHandsFreeMode = recordingStatus.mode === "hands-free";
 
-  // Track when recording state changes to "recording" after a click
   useEffect(() => {
     if (recordingStatus.state === "recording" && clickTimeRef.current) {
-      const timeSinceClick = performance.now() - clickTimeRef.current;
-      console.log(
-        `FAB: Recording state became 'recording' ${timeSinceClick.toFixed(2)}ms after user click`,
-      );
-      clickTimeRef.current = null; // Reset
+      clickTimeRef.current = null;
     }
   }, [recordingStatus.state]);
 
-  // Handler for widget click to start recording in hands-free mode
+  // Acquire/release mouse events based on hover and menu state.
+  // Uses refCount via MouseEventsContext so it doesn't conflict
+  // with other consumers (e.g. toast hover in useWidgetNotifications).
+  const shouldReceiveEvents = isHovered || isMenuOpen;
+  useEffect(() => {
+    if (shouldReceiveEvents && !hasAcquiredRef.current) {
+      acquire();
+      hasAcquiredRef.current = true;
+    } else if (!shouldReceiveEvents && hasAcquiredRef.current) {
+      release();
+      hasAcquiredRef.current = false;
+    }
+  }, [shouldReceiveEvents, acquire, release]);
+
+  // Release on unmount to prevent leaked refCount
+  useEffect(() => {
+    return () => {
+      if (hasAcquiredRef.current) {
+        release();
+        hasAcquiredRef.current = false;
+      }
+    };
+  }, [release]);
+
+  const handleMouseEnter = () => setIsHovered(true);
+  const handleMouseLeave = () => setIsHovered(false);
+
+  // Force isHovered=false when menu closes because mouseleave won't fire
+  // if cursor stays within the pill's DOM area after selecting a menu item.
+  // The pill collapses briefly; the next mouse movement triggers mouseenter.
+  const handleMenuOpenChange = (open: boolean) => {
+    setIsMenuOpen(open);
+    if (!open) setIsHovered(false);
+  };
+
+  const handleModeChanged = useCallback((modeName: string) => {
+    setModeNotification(modeName);
+  }, []);
+
+  // Auto-dismiss mode notification
+  useEffect(() => {
+    if (!modeNotification) return;
+    const timer = setTimeout(() => setModeNotification(null), 2000);
+    return () => clearTimeout(timer);
+  }, [modeNotification]);
+
   const handleButtonClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const clickTime = performance.now();
-    clickTimeRef.current = clickTime;
-    console.log("FAB: Button clicked at", clickTime);
-    console.log("FAB: Current status:", recordingStatus);
+    clickTimeRef.current = performance.now();
 
-    // Only start recording if not already recording
     if (recordingStatus.state === "idle") {
-      const startRecordingCallTime = performance.now();
       await startRecording();
-      const startRecordingReturnTime = performance.now();
-      console.log(
-        `FAB: startRecording() call took ${(startRecordingReturnTime - startRecordingCallTime).toFixed(2)}ms to return`,
-      );
-      console.log("FAB: Started hands-free recording");
     } else {
-      console.log("FAB: Already recording, ignoring click");
-      clickTimeRef.current = null; // Reset since we're not starting
+      clickTimeRef.current = null;
     }
   };
 
-  // Handler for stop button in hands-free mode
   const handleStopClick = async (e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // Prevent triggering the main button click
-    console.log("FAB: Stopping hands-free recording");
+    e.stopPropagation();
     await stopRecording();
   };
 
-  // Debounced mouse leave handler
-  const handleMouseLeave = async () => {
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-    }
-    leaveTimeoutRef.current = setTimeout(async () => {
-      setIsHovered(false);
-      // Re-enable mouse event forwarding when not hovering
-      try {
-        await setIgnoreMouseEvents.mutateAsync({ ignore: true });
-        console.debug("Re-enabled mouse event forwarding");
-      } catch (error) {
-        console.error("Failed to re-enable mouse event forwarding:", error);
-      }
-    }, DEBOUNCE_DELAY);
-  };
+  const expanded = isRecording || isStopping || isHovered || isMenuOpen;
+  const isIdle = !isRecording && !isStopping;
 
-  // Mouse enter handler - clears any pending leave timeout
-  const handleMouseEnter = async () => {
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-      leaveTimeoutRef.current = null;
-    }
-    setIsHovered(true);
-    // Disable mouse event forwarding to make widget clickable
-    await setIgnoreMouseEvents.mutateAsync({ ignore: false });
-    console.debug("Disabled mouse event forwarding for clicking");
-  };
-
-  const expanded = isRecording || isStopping || isHovered;
-
-  // Function to render widget content based on state
   const renderWidgetContent = () => {
     if (!expanded) return null;
 
-    // Show processing indicator when stopping
     if (isStopping) {
       return <ProcessingIndicator />;
     }
 
-    // Show waveform with stop button when in hands-free mode and recording
     if (isHandsFreeMode && isRecording) {
       return (
         <>
@@ -172,39 +159,63 @@ export const FloatingButton: React.FC = () => {
       );
     }
 
-    // Show waveform visualization for all other states
-    return (
-      <button
-        className="justify-center items-center flex flex-1 gap-1 h-full w-full"
-        role="button"
-        onClick={handleButtonClick}
-      >
-        <WaveformVisualization
-          isRecording={isRecording}
-          voiceDetected={voiceDetected}
+    if (isRecording) {
+      return (
+        <div className="justify-center items-center flex flex-1 gap-1 h-full w-full">
+          <WaveformVisualization
+            isRecording={isRecording}
+            voiceDetected={voiceDetected}
+          />
+        </div>
+      );
+    }
+
+    if (isIdle) {
+      return (
+        <WidgetToolbar
+          onStartRecording={handleButtonClick}
+          onMenuOpenChange={handleMenuOpenChange}
+          onModeChanged={handleModeChanged}
         />
-      </button>
-    );
+      );
+    }
+
+    return null;
   };
 
   return (
     <div
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`
-        transition-all duration-200 ease-in-out
-        ${expanded ? "h-[24px] w-[96px]" : "h-[8px] w-[48px]"}
-        bg-black/70 rounded-[24px] backdrop-blur-md ring-[1px] ring-black/60 shadow-[0px_0px_15px_0px_rgba(0,0,0,0.40)]
-        before:content-[''] before:absolute before:inset-[1px] before:rounded-[23px] before:outline before:outline-white/15 before:pointer-events-none
-        mb-2 cursor-pointer select-none
-      `}
+      className="relative"
       style={{ pointerEvents: "auto" }}
     >
-      {expanded && (
-        <div className="flex gap-[2px] h-full w-full justify-between">
-          {renderWidgetContent()}
+      {/* Mode notification - centered above pill */}
+      {modeNotification && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none z-50 animate-in fade-in-0 zoom-in-95 duration-150">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-black/90 backdrop-blur-md rounded-xl text-white text-sm whitespace-nowrap shadow-[0px_0px_15px_0px_rgba(0,0,0,0.40)] ring-[1px] ring-white/15">
+            <IconSparkles className="w-4 h-4 text-white/70 shrink-0" />
+            <span>{modeNotification} mode active</span>
+          </div>
         </div>
       )}
+
+      {/* Pill */}
+      <div
+        className={`
+          transition-all duration-200 ease-in-out
+          ${expanded ? "h-[40px] w-[120px] bg-black" : "h-[10px] w-[56px] bg-black/70"}
+          rounded-[24px] backdrop-blur-md ring-[1px] ring-black/60 shadow-[0px_0px_15px_0px_rgba(0,0,0,0.40)]
+          before:content-[''] before:absolute before:inset-[1px] before:rounded-[23px] before:outline before:outline-white/15 before:pointer-events-none
+          mb-2 cursor-pointer select-none
+        `}
+      >
+        {expanded && (
+          <div className="flex gap-[2px] h-full w-full justify-between">
+            {renderWidgetContent()}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

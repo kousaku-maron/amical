@@ -18,6 +18,7 @@ class ShortcutManager {
 
     private var pushToTalkKeys: [String] = []
     private var toggleRecordingKeys: [String] = []
+    private var cycleModeKeys: [String] = []
 
     // ============================================================================
     // IMPORTANT: Fn Key State Tracking
@@ -68,12 +69,13 @@ class ShortcutManager {
 
     /// Update the configured shortcuts
     /// Called from IOBridge when setShortcuts RPC is received
-    func setShortcuts(pushToTalk: [String], toggleRecording: [String]) {
+    func setShortcuts(pushToTalk: [String], toggleRecording: [String], cycleMode: [String]) {
         lock.lock()
         defer { lock.unlock() }
         self.pushToTalkKeys = pushToTalk
         self.toggleRecordingKeys = toggleRecording
-        logToStderr("[ShortcutManager] Shortcuts updated - PTT: \(pushToTalk), Toggle: \(toggleRecording)")
+        self.cycleModeKeys = cycleMode
+        logToStderr("[ShortcutManager] Shortcuts updated - PTT: \(pushToTalk), Toggle: \(toggleRecording), CycleMode: \(cycleMode)")
     }
 
     /// Update the tracked Fn key state
@@ -152,7 +154,7 @@ class ShortcutManager {
         defer { lock.unlock() }
 
         // Early exit if no shortcuts configured
-        if pushToTalkKeys.isEmpty && toggleRecordingKeys.isEmpty {
+        if pushToTalkKeys.isEmpty && toggleRecordingKeys.isEmpty && cycleModeKeys.isEmpty {
             return false
         }
 
@@ -189,6 +191,10 @@ class ShortcutManager {
         let toggleKeys = Set(toggleRecordingKeys)
         let toggleMatch = !toggleKeys.isEmpty && toggleKeys == activeKeys
 
-        return pttMatch || toggleMatch
+        // CycleMode: exact match (only these keys pressed)
+        let cmKeys = Set(cycleModeKeys)
+        let cmMatch = !cmKeys.isEmpty && cmKeys == activeKeys
+
+        return pttMatch || toggleMatch || cmMatch
     }
 }

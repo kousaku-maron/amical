@@ -23,7 +23,8 @@ import {
 import { isMacOS } from "../utils/platform";
 
 // Current baseline settings schema version
-const CURRENT_SETTINGS_VERSION = 1;
+// Bump this when adding migrations to migrateSettingsData()
+const CURRENT_SETTINGS_VERSION = 2;
 
 function createDefaultMode(
   settings: Pick<AppSettingsData, "dictation" | "formatterConfig"> = {},
@@ -53,12 +54,14 @@ const getDefaultShortcuts = () => {
     return {
       pushToTalk: ["Fn"],
       toggleRecording: ["Fn", "Space"],
+      cycleMode: ["Alt", "Shift", "K"],
     };
   } else {
     // Windows and Linux
     return {
       pushToTalk: ["Ctrl", "Win"],
       toggleRecording: ["Ctrl", "Win", "Space"],
+      cycleMode: ["Alt", "Shift", "K"],
     };
   }
 };
@@ -199,6 +202,42 @@ async function createDefaultSettings(): Promise<void> {
   };
 
   await db.insert(appSettings).values(newSettings);
+}
+
+/**
+ * Run data migrations on the JSON settings blob.
+ * Called once at startup after DB schema migrations complete.
+ * Uses the `version` column to track which migrations have been applied.
+ */
+export async function migrateSettingsData(): Promise<void> {
+  const result = await db
+    .select()
+    .from(appSettings)
+    .where(eq(appSettings.id, SETTINGS_ID));
+
+  if (result.length === 0) return; // No record yet; defaults will be used
+
+  const record = result[0];
+  const version = record.version ?? 1;
+
+  if (version >= CURRENT_SETTINGS_VERSION) return; // Already up to date
+
+  const data = { ...record.data };
+
+  // v1 → v2: Add cycleMode default to existing shortcuts
+  if (version < 2) {
+    if (data.shortcuts && data.shortcuts.cycleMode === undefined) {
+      data.shortcuts = {
+        ...data.shortcuts,
+        cycleMode: getDefaultShortcuts().cycleMode,
+      };
+    }
+  }
+
+  await db
+    .update(appSettings)
+    .set({ data, version: CURRENT_SETTINGS_VERSION, updatedAt: new Date() })
+    .where(eq(appSettings.id, SETTINGS_ID));
 }
 
 // Export default settings for reference

@@ -7,10 +7,11 @@ import {
   type WidgetNotificationAction,
 } from "@/types/widget-notification";
 import { WidgetToast } from "../components/WidgetToast";
+import { useMouseEvents } from "../contexts/MouseEventsContext";
 
 export const useWidgetNotifications = () => {
   const navigateMainWindow = api.widget.navigateMainWindow.useMutation();
-  const setIgnoreMouseEvents = api.widget.setIgnoreMouseEvents.useMutation();
+  const { acquire, release } = useMouseEvents();
   const { data: settings } = api.settings.getSettings.useQuery();
   const { defaultDeviceName } = useAudioDevices();
 
@@ -19,19 +20,13 @@ export const useWidgetNotifications = () => {
     return settings?.recording?.preferredMicrophoneName || defaultDeviceName;
   };
 
-  const reEnablePassThrough = () => {
-    setTimeout(() => {
-      setIgnoreMouseEvents.mutate({ ignore: true });
-    }, 100);
-  };
-
   const handleActionClick = async (action: WidgetNotificationAction) => {
     if (action.navigateTo) {
       navigateMainWindow.mutate({ route: action.navigateTo });
     } else if (action.externalUrl) {
       await window.electronAPI.openExternal(action.externalUrl);
     }
-    reEnablePassThrough();
+    // release is handled by onDismiss via toast.dismiss() below
   };
 
   api.recording.widgetNotifications.useSubscription(undefined, {
@@ -44,22 +39,28 @@ export const useWidgetNotifications = () => {
 
       toast.custom(
         (toastId) => (
-          <WidgetToast
-            title={notification.title}
-            description={description}
-            primaryAction={notification.primaryAction}
-            secondaryAction={notification.secondaryAction}
-            onActionClick={(action) => {
-              handleActionClick(action);
-              toast.dismiss(toastId);
-            }}
-          />
+          <div
+            onMouseEnter={acquire}
+            onMouseLeave={release}
+            style={{ pointerEvents: "auto" }}
+          >
+            <WidgetToast
+              title={notification.title}
+              description={description}
+              primaryAction={notification.primaryAction}
+              secondaryAction={notification.secondaryAction}
+              onActionClick={(action) => {
+                handleActionClick(action);
+                toast.dismiss(toastId);
+              }}
+            />
+          </div>
         ),
         {
           unstyled: true,
           duration: WIDGET_NOTIFICATION_TIMEOUT,
-          onDismiss: reEnablePassThrough,
-          onAutoClose: reEnablePassThrough,
+          onDismiss: release,
+          onAutoClose: release,
         },
       );
     },

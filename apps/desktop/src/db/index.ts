@@ -63,6 +63,10 @@ export async function initializeDatabase() {
       migrationsFolder: migrationsPath,
     });
 
+    // Run JSON settings data migrations (e.g. backfilling new shortcut defaults)
+    const { migrateSettingsData } = await import("./app-settings");
+    await migrateSettingsData();
+
     logger.db.info(
       "Database initialized and migrations completed successfully",
     );

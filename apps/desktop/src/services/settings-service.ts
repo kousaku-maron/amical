@@ -15,6 +15,7 @@ import type { AppSettingsData, ModeConfig } from "../db/schema";
 export interface ShortcutsConfig {
   pushToTalk: string[];
   toggleRecording: string[];
+  cycleMode: string[];
 }
 
 export interface AppPreferences {
@@ -153,6 +154,7 @@ export class SettingsService extends EventEmitter {
     return {
       pushToTalk: shortcuts?.pushToTalk ?? [],
       toggleRecording: shortcuts?.toggleRecording ?? [],
+      cycleMode: shortcuts?.cycleMode ?? [],
     };
   }
 
@@ -168,6 +170,7 @@ export class SettingsService extends EventEmitter {
       toggleRecording: shortcuts.toggleRecording?.length
         ? shortcuts.toggleRecording
         : undefined,
+      cycleMode: shortcuts.cycleMode?.length ? shortcuts.cycleMode : undefined,
     };
     await updateSettingsSection("shortcuts", dataToStore);
   }
@@ -491,6 +494,41 @@ export class SettingsService extends EventEmitter {
       modes: { ...settings.modes!, activeModeId: modeId },
     });
     this.emit("active-mode-changed", { modeId });
+  }
+
+  /**
+   * Cycle to the next mode and return the updated state.
+   * Used by the global shortcut to rotate through modes.
+   * Returns null if already cycling (rapid-press guard).
+   */
+  private isCycling = false;
+  async cycleActiveMode(): Promise<{
+    activeModeId: string;
+    modes: { id: string; name: string }[];
+  } | null> {
+    if (this.isCycling) return null;
+    this.isCycling = true;
+    try {
+      const { items, activeModeId } = await this.getModes();
+      const toModes = (list: typeof items) =>
+        list.map((m) => ({ id: m.id, name: m.name }));
+
+      // Single mode — nothing to cycle, just return current state for overlay
+      if (items.length <= 1) {
+        return { activeModeId, modes: toModes(items) };
+      }
+
+      // findIndex returns -1 if activeModeId not found; (−1+1)%n = 0 → first item
+      const currentIndex = items.findIndex((m) => m.id === activeModeId);
+      const nextIndex = (currentIndex + 1) % items.length;
+      const nextMode = items[nextIndex];
+
+      await this.setActiveMode(nextMode.id);
+
+      return { activeModeId: nextMode.id, modes: toModes(items) };
+    } finally {
+      this.isCycling = false;
+    }
   }
 
   async createMode(

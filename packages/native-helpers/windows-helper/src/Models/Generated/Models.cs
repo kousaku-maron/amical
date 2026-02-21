@@ -295,6 +295,9 @@ namespace WindowsHelper.Models
 
     public partial class SetShortcutsParams
     {
+        [JsonPropertyName("cycleMode")]
+        public List<string> CycleMode { get; set; }
+
         [JsonPropertyName("pushToTalk")]
         public List<string> PushToTalk { get; set; }
 

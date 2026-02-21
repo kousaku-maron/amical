@@ -362,7 +362,8 @@ namespace WindowsHelper
 
                 ShortcutManager.Instance.SetShortcuts(
                     setShortcutsParams.PushToTalk?.ToArray() ?? Array.Empty<string>(),
-                    setShortcutsParams.ToggleRecording?.ToArray() ?? Array.Empty<string>()
+                    setShortcutsParams.ToggleRecording?.ToArray() ?? Array.Empty<string>(),
+                    setShortcutsParams.CycleMode?.ToArray() ?? Array.Empty<string>()
                 );
 
                 return new RpcResponse
