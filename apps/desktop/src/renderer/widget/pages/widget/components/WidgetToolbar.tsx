@@ -59,6 +59,8 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
   const shortcutsQuery = api.settings.getShortcuts.useQuery();
   const pttShortcut = shortcutsQuery.data?.pushToTalk;
   const pttDisplay = pttShortcut?.join("+") ?? "";
+  const cycleModeShortcut = shortcutsQuery.data?.cycleMode;
+  const cycleModeDisplay = cycleModeShortcut?.join("+") ?? "";
 
   const modesQuery = api.settings.getModes.useQuery();
   const modes = modesQuery.data?.items ?? [];
@@ -86,7 +88,13 @@ export const WidgetToolbar: React.FC<WidgetToolbarProps> = ({
       {/* Tooltip - centered on the pill */}
       <WidgetTooltip
         text={hoveredButton === "modes" ? "Change mode" : "Start recording"}
-        shortcut={hoveredButton === "grizzo" ? pttDisplay : undefined}
+        shortcut={
+          hoveredButton === "grizzo"
+            ? pttDisplay
+            : hoveredButton === "modes"
+              ? cycleModeDisplay
+              : undefined
+        }
         visible={hoveredButton !== null && !menuOpen}
       />
 

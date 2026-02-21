@@ -285,6 +285,20 @@ export class ServiceManager {
     // Connect shortcut events to recording manager
     this.recordingManager.setupShortcutListeners(this.shortcutManager);
 
+    // Connect cycle-mode shortcut to mode switching + widget overlay
+    this.shortcutManager.on("cycle-mode-triggered", async () => {
+      try {
+        const result = await this.settingsService!.cycleActiveMode();
+        if (!result) return;
+        const widget = this.windowManager?.getWidgetWindow();
+        if (widget && !widget.isDestroyed()) {
+          widget.webContents.send("mode-cycled", result);
+        }
+      } catch (error) {
+        logger.main.error("Failed to cycle mode", { error });
+      }
+    });
+
     logger.main.info("Shortcut manager initialized");
   }
 

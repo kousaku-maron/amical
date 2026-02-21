@@ -22,6 +22,7 @@ interface KeyInfo {
 interface ShortcutConfig {
   pushToTalk: string[];
   toggleRecording: string[];
+  cycleMode: string[];
 }
 
 export class ShortcutManager extends EventEmitter {
@@ -29,10 +30,14 @@ export class ShortcutManager extends EventEmitter {
   private shortcuts: ShortcutConfig = {
     pushToTalk: [],
     toggleRecording: [],
+    cycleMode: [],
   };
   private settingsService: SettingsService;
   private nativeBridge: NativeBridge | null = null;
   private isRecordingShortcut: boolean = false;
+  // Rising-edge detection: only emit on false→true transition
+  private prevToggleRecordingPressed = false;
+  private prevCycleModePressed = false;
 
   constructor(settingsService: SettingsService) {
     super();
@@ -71,6 +76,7 @@ export class ShortcutManager extends EventEmitter {
       await this.nativeBridge.setShortcuts({
         pushToTalk: this.shortcuts.pushToTalk,
         toggleRecording: this.shortcuts.toggleRecording,
+        cycleMode: this.shortcuts.cycleMode,
       });
       log.info("Shortcuts synced to native helper");
     } catch (error) {
@@ -91,16 +97,23 @@ export class ShortcutManager extends EventEmitter {
     type: ShortcutType,
     keys: string[],
   ): Promise<ValidationResult> {
-    // Get the other shortcut for cross-validation
-    const otherShortcut =
-      type === "pushToTalk"
-        ? this.shortcuts.toggleRecording
-        : this.shortcuts.pushToTalk;
+    // Get all other shortcuts for cross-validation
+    const allShortcuts = {
+      pushToTalk: this.shortcuts.pushToTalk,
+      toggleRecording: this.shortcuts.toggleRecording,
+      cycleMode: this.shortcuts.cycleMode,
+    };
+    const otherShortcuts = Object.entries(allShortcuts)
+      .filter(([key]) => key !== type)
+      .map(([key, value]) => ({
+        type: key as ShortcutType,
+        keys: value,
+      }));
 
     // Validate the shortcut
     const result = validateShortcutComprehensive({
       currentShortcut: keys,
-      otherShortcut,
+      otherShortcuts,
       shortcutType: type,
       platform: process.platform,
     });
@@ -227,10 +240,19 @@ export class ShortcutManager extends EventEmitter {
     const isPTTPressed = this.isPTTShortcutPressed();
     this.emit("ptt-state-changed", isPTTPressed);
 
-    // Check toggle recording shortcut
-    if (this.isToggleRecordingShortcutPressed()) {
+    // Check toggle recording shortcut (rising edge only)
+    const isTogglePressed = this.isToggleRecordingShortcutPressed();
+    if (isTogglePressed && !this.prevToggleRecordingPressed) {
       this.emit("toggle-recording-triggered");
     }
+    this.prevToggleRecordingPressed = isTogglePressed;
+
+    // Check cycle mode shortcut (rising edge only)
+    const isCycleModePressed = this.isCycleModeShortcutPressed();
+    if (isCycleModePressed && !this.prevCycleModePressed) {
+      this.emit("cycle-mode-triggered");
+    }
+    this.prevCycleModePressed = isCycleModePressed;
   }
 
   private isPTTShortcutPressed(): boolean {
@@ -257,6 +279,21 @@ export class ShortcutManager extends EventEmitter {
     return (
       toggleKeys.length === activeKeysList.length &&
       toggleKeys.every((key) => activeKeysList.includes(key))
+    );
+  }
+
+  private isCycleModeShortcutPressed(): boolean {
+    const cycleModeKeys = this.shortcuts.cycleMode;
+    if (!cycleModeKeys || cycleModeKeys.length === 0) {
+      return false;
+    }
+
+    const activeKeysList = this.getActiveKeys();
+
+    // Exact match - only these keys pressed, no extra keys
+    return (
+      cycleModeKeys.length === activeKeysList.length &&
+      cycleModeKeys.every((key) => activeKeysList.includes(key))
     );
   }
 

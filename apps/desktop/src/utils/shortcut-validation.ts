@@ -3,11 +3,16 @@
  * Provides comprehensive validation for keyboard shortcuts
  */
 
-export type ShortcutType = "pushToTalk" | "toggleRecording";
+export type ShortcutType = "pushToTalk" | "toggleRecording" | "cycleMode";
+
+interface ShortcutReference {
+  type: ShortcutType;
+  keys: string[];
+}
 
 export interface ValidationContext {
   currentShortcut: string[];
-  otherShortcut: string[];
+  otherShortcuts: ShortcutReference[];
   shortcutType: ShortcutType;
   platform: NodeJS.Platform;
 }
@@ -340,32 +345,43 @@ export function checkDuplicateModifierPairs(
 }
 
 /**
- * Check if toggle shortcut is a subset of PTT shortcut (soft warning)
- * Only warns when setting toggleRecording
+ * Check subset/superset overlap between shortcuts (soft warning)
+ * Exact duplicates are handled separately as errors.
  */
 export function checkSubsetConflict(
   currentKeys: string[],
+  currentType: ShortcutType,
   otherKeys: string[],
-  shortcutType: ShortcutType,
+  otherType: ShortcutType,
 ): ValidationResult {
-  // Only warn when setting toggleRecording
-  if (shortcutType !== "toggleRecording") return { valid: true };
-  if (otherKeys.length === 0 || currentKeys.length === 0)
+  if (otherKeys.length === 0 || currentKeys.length === 0) {
     return { valid: true };
+  }
 
-  const toggleNormalized = normalizeKeys(currentKeys);
-  const pttNormalized = normalizeKeys(otherKeys);
+  const currentNormalized = normalizeKeys(currentKeys);
+  const otherNormalized = normalizeKeys(otherKeys);
 
-  // Check if toggle shortcut is a subset of PTT shortcut
-  const isSubset = toggleNormalized.every((key) =>
-    pttNormalized.some((pttKey) => pttKey === key),
+  const currentIsSubset = currentNormalized.every((key) =>
+    otherNormalized.includes(key),
+  );
+  const otherIsSubset = otherNormalized.every((key) =>
+    currentNormalized.includes(key),
   );
 
-  if (isSubset && toggleNormalized.length < pttNormalized.length) {
+  // Strict subset only; exact match is already rejected as duplicate.
+  const hasSubsetOverlap =
+    (currentIsSubset && currentNormalized.length < otherNormalized.length) ||
+    (otherIsSubset && otherNormalized.length < currentNormalized.length);
+
+  if (hasSubsetOverlap) {
+    const typeLabels: Record<ShortcutType, string> = {
+      pushToTalk: "Push-to-talk",
+      toggleRecording: "Hands-free mode",
+      cycleMode: "Change mode",
+    };
     return {
-      valid: true, // Still valid, just warning
-      warning:
-        "This overlaps with your Push-to-talk shortcut and may cause issues",
+      valid: true,
+      warning: `${typeLabels[currentType]} overlaps with ${typeLabels[otherType]} and may cause issues`,
     };
   }
 
@@ -379,15 +395,20 @@ export function checkSubsetConflict(
 export function validateShortcutComprehensive(
   context: ValidationContext,
 ): ValidationResult {
-  const { currentShortcut, otherShortcut, shortcutType, platform } = context;
+  const { currentShortcut, otherShortcuts, shortcutType, platform } = context;
 
   // 1. Max keys length check
   const maxKeysCheck = checkMaxKeysLength(currentShortcut);
   if (!maxKeysCheck.valid) return maxKeysCheck;
 
-  // 2. Duplicate shortcut check
-  const duplicateCheck = checkDuplicateShortcut(currentShortcut, otherShortcut);
-  if (!duplicateCheck.valid) return duplicateCheck;
+  // 2. Duplicate shortcut check (against all other shortcuts)
+  for (const otherShortcut of otherShortcuts) {
+    const duplicateCheck = checkDuplicateShortcut(
+      currentShortcut,
+      otherShortcut.keys,
+    );
+    if (!duplicateCheck.valid) return duplicateCheck;
+  }
 
   // 3. Reserved shortcut check
   const reservedCheck = checkReservedShortcut(currentShortcut, platform);
@@ -401,15 +422,23 @@ export function validateShortcutComprehensive(
   const pairCheck = checkDuplicateModifierPairs(currentShortcut, platform);
   if (!pairCheck.valid) return pairCheck;
 
-  // 6. Subset conflict check (soft warning - returns valid:true with warning)
-  const subsetCheck = checkSubsetConflict(
-    currentShortcut,
-    otherShortcut,
-    shortcutType,
-  );
+  // 6. Subset conflict check (warning across all shortcut combinations)
+  let warning: string | undefined;
+  for (const otherShortcut of otherShortcuts) {
+    const subsetCheck = checkSubsetConflict(
+      currentShortcut,
+      shortcutType,
+      otherShortcut.keys,
+      otherShortcut.type,
+    );
+    if (subsetCheck.warning) {
+      warning = subsetCheck.warning;
+      break;
+    }
+  }
 
   return {
     valid: true,
-    warning: subsetCheck.warning,
+    warning,
   };
 }

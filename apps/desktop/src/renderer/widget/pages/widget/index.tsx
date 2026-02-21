@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { FloatingButton } from "./components/FloatingButton";
+import { ModeSwitchOverlay } from "../../components/ModeSwitchOverlay";
 import { useWidgetNotifications } from "../../hooks/useWidgetNotifications";
 import { MouseEventsProvider } from "../../contexts/MouseEventsContext";
 import { api } from "@/trpc/react";
@@ -29,5 +30,10 @@ function WidgetPageContent() {
     };
   }, [utils]);
 
-  return <FloatingButton />;
+  return (
+    <>
+      <ModeSwitchOverlay />
+      <FloatingButton />
+    </>
+  );
 }
