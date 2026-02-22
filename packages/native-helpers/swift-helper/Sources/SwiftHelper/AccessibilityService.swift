@@ -451,30 +451,11 @@ class AccessibilityService {
         logToStderr("[AccessibilityService] Attempting to paste transcript: \(transcript).")
 
         let pasteboard = NSPasteboard.general
-        let originalPasteboardItems =
-            pasteboard.pasteboardItems?.compactMap { item -> NSPasteboardItem? in
-                let newItem = NSPasteboardItem()
-                var hasData = false
-                for type in item.types ?? [] {
-                    if let data = item.data(forType: type) {
-                        newItem.setData(data, forType: type)
-                        hasData = true
-                    }
-                }
-                return hasData ? newItem : nil
-            } ?? []
-
-        let originalChangeCount = pasteboard.changeCount  // Save change count to detect external modifications
-
         pasteboard.clearContents()
         let success = pasteboard.setString(transcript, forType: .string)
 
         if !success {
             logToStderr("[AccessibilityService] Failed to set string on pasteboard.")
-            // Restore original content before returning
-            restorePasteboard(
-                pasteboard: pasteboard, items: originalPasteboardItems,
-                originalChangeCount: originalChangeCount)
             return false
         }
 
@@ -485,19 +466,15 @@ class AccessibilityService {
         cmdDown?.flags = .maskCommand
 
         let vDown = CGEvent(keyboardEventSource: source, virtualKey: VK_V, keyDown: true)
-        vDown?.flags = .maskCommand  // Keep command flag for the V press as well
+        vDown?.flags = .maskCommand
 
         let vUp = CGEvent(keyboardEventSource: source, virtualKey: VK_V, keyDown: false)
         vUp?.flags = .maskCommand
 
         let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: VK_COMMAND, keyDown: false)
-        // No flags needed for key up typically, or just .maskCommand if it was held
 
         if cmdDown == nil || vDown == nil || vUp == nil || cmdUp == nil {
             logToStderr("[AccessibilityService] Failed to create CGEvent for paste.")
-            restorePasteboard(
-                pasteboard: pasteboard, items: originalPasteboardItems,
-                originalChangeCount: originalChangeCount)
             return false
         }
 
@@ -510,37 +487,7 @@ class AccessibilityService {
 
         logToStderr("[AccessibilityService] Paste keyboard events posted.")
 
-        // Restore the original pasteboard content after a short delay
-        // to allow the paste action to complete.
-        DispatchQueue.main.asyncAfter(deadline: .now() + PASTE_RESTORE_DELAY_SECONDS) {
-            self.restorePasteboard(
-                pasteboard: pasteboard, items: originalPasteboardItems,
-                originalChangeCount: originalChangeCount)
-        }
-
         return true
-    }
-
-    private func restorePasteboard(
-        pasteboard: NSPasteboard, items: [NSPasteboardItem], originalChangeCount: Int
-    ) {
-        // Only restore if our temporary content is still the active content on the pasteboard.
-        // This means the changeCount should be exactly one greater than when we saved it,
-        // indicating our setString operation was the last modification.
-        if pasteboard.changeCount == originalChangeCount + 1 {
-            pasteboard.clearContents()
-            if !items.isEmpty {
-                pasteboard.writeObjects(items)
-            }
-            logToStderr("[AccessibilityService] Original pasteboard content restored.")
-        } else {
-            // If changeCount is different, it means another app or the user has modified the pasteboard
-            // after we set our transcript but before this restoration block was executed.
-            // In this case, we should not interfere with the new pasteboard content.
-            logToStderr(
-                "[AccessibilityService] Pasteboard changed by another process or a new copy occurred (expected changeCount: \(originalChangeCount + 1), current: \(pasteboard.changeCount)); not restoring original content to avoid conflict."
-            )
-        }
     }
 
     // Determines whether a keyboard event should be forwarded to the Electron application.

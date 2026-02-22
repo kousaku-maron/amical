@@ -67,9 +67,6 @@ let WEB_AREA_ANCESTOR_SEARCH_DEPTH = 15
 /// Best-effort timeout for extraction (milliseconds)
 let EXTRACTION_TIMEOUT_MS: Double = 600.0
 
-/// Delay before restoring pasteboard after paste (seconds)
-let PASTE_RESTORE_DELAY_SECONDS: Double = 0.2
-
 // MARK: - Virtual Key Codes (macOS)
 
 /// Virtual key code for 'V' key
