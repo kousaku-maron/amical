@@ -53,9 +53,14 @@ export function CustomInstructionsEditor({
         }}
         className="min-h-24 text-sm"
       />
-      <p className="text-xs text-muted-foreground mt-1 text-right">
-        {currentLength} / {MAX_LENGTH}
-      </p>
+      <div className="flex items-center justify-between mt-1">
+        <p className="text-xs text-muted-foreground">
+          If not set, fillers will be removed and the text will be formatted.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {currentLength} / {MAX_LENGTH}
+        </p>
+      </div>
     </div>
   );
 }
